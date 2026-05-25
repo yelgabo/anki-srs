@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { auth, signOut } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const session = await auth();
+  if (session?.user) redirect("/today");
   const problemCount = await prisma.problem.count();
 
   return (
@@ -17,41 +19,20 @@ export default async function Home() {
         </p>
       </header>
 
-      {session?.user ? (
-        <div className="space-y-4">
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Signed in as <span className="font-mono">{session.user.email}</span>
-          </p>
-          <div className="flex gap-3">
-            <Link
-              href="/review"
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-            >
-              Start review →
-            </Link>
-            <form
-              action={async () => {
-                "use server";
-                await signOut({ redirectTo: "/" });
-              }}
-            >
-              <button
-                type="submit"
-                className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
-        </div>
-      ) : (
+      <div className="flex gap-3">
         <Link
           href="/signin"
-          className="inline-block rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
         >
-          Sign in to review
+          Sign in
         </Link>
-      )}
+        <Link
+          href="/signup"
+          className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+        >
+          Sign up
+        </Link>
+      </div>
     </div>
   );
 }

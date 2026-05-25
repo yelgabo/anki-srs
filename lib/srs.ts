@@ -1,17 +1,22 @@
-// SM-2 scheduler. Pure function; pass `now` for testability.
+// SM-2 scheduler with deterministic ±15% interval fuzz.
 //
 // Grade mapping (matches Anki's four-button UX):
 //   0 = Again, 1 = Hard, 2 = Good, 3 = Easy
 //
 // Reference: https://www.supermemo.com/en/blog/application-of-a-computer-to-improve-the-results-obtained-in-working-with-the-supermemo-method
+//
+// Fuzz: the post-SM-2 intervalDays is jittered by ±15% via a deterministic
+// hash of (cardId, reps). Same (cardId, reps) → same multiplier. Cards that
+// would all otherwise pile on Monday spread across Sat/Sun/Mon/Tue.
+// Fuzz never produces a negative interval (clamped to 0 when SM-2 returned 0).
 
 export type Grade = 0 | 1 | 2 | 3;
 
 export interface CardState {
-  ease: number;          // ease factor, >= 1.3
-  intervalDays: number;  // interval in days, fractional ok
-  reps: number;          // total successful reps
-  lapses: number;        // number of times graded Again
+  ease: number;
+  intervalDays: number;
+  reps: number;
+  lapses: number;
 }
 
 export interface Scheduled extends CardState {
@@ -19,14 +24,22 @@ export interface Scheduled extends CardState {
   lastReviewedAt: Date;
 }
 
+export interface ScheduleContext {
+  cardId: string;
+  now?: Date;
+  /** Override for tests; ignore for production. */
+  disableFuzz?: boolean;
+}
+
 const MIN_EASE = 1.3;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const FUZZ_AMPLITUDE = 0.15;
 
-export function schedule(state: CardState, grade: Grade, now: Date = new Date()): Scheduled {
+export function schedule(state: CardState, grade: Grade, ctx: ScheduleContext): Scheduled {
+  const now = ctx.now ?? new Date();
   let { ease, intervalDays, reps, lapses } = state;
 
   if (grade === 0) {
-    // Again: reset interval, count lapse, drop ease.
     lapses += 1;
     reps = 0;
     intervalDays = 0;
@@ -43,9 +56,13 @@ export function schedule(state: CardState, grade: Grade, now: Date = new Date())
       intervalDays = intervalDays * mult;
     }
 
-    // SM-2 ease adjustment (Anki-style deltas).
     const deltas = { 1: -0.15, 2: 0, 3: 0.15 } as const;
     ease = Math.max(MIN_EASE, ease + deltas[grade]);
+  }
+
+  // Fuzz (skipped when intervalDays is 0 — no point jittering "due now").
+  if (!ctx.disableFuzz && intervalDays > 0) {
+    intervalDays = applyFuzz(intervalDays, ctx.cardId, reps);
   }
 
   const dueAt = new Date(now.getTime() + intervalDays * DAY_MS);
@@ -58,6 +75,20 @@ export function schedule(state: CardState, grade: Grade, now: Date = new Date())
     dueAt,
     lastReviewedAt: now,
   };
+}
+
+// Deterministic hash → multiplier in [1 - amp, 1 + amp].
+function applyFuzz(interval: number, cardId: string, reps: number): number {
+  const seed = `${cardId}:${reps}`;
+  // FNV-1a 32-bit
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  const u = (h >>> 0) / 0xffffffff; // [0, 1)
+  const mult = 1 + (u * 2 - 1) * FUZZ_AMPLITUDE; // [1-amp, 1+amp]
+  return Math.max(0, interval * mult);
 }
 
 function round(n: number, p: number): number {

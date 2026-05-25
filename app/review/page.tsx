@@ -1,70 +1,100 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ensureCards } from "./actions";
+import { readSkipCookie } from "@/lib/skip-cookie";
 import ReviewCard from "./ReviewCard";
+import UndoButton from "@/app/components/UndoButton";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReviewPage() {
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+type SearchParams = Promise<{ ahead?: string; force?: string; error?: string }>;
+
+export default async function ReviewPage({ searchParams }: { searchParams: SearchParams }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/signin");
-
   const userId = session.user.id;
+
+  const sp = await searchParams;
+  const ahead = sp.ahead ? Math.max(0, Math.min(20, Number(sp.ahead) || 0)) : 0;
+  const force = sp.force === "1";
+
   await ensureCards(userId);
 
+  const skipped = await readSkipCookie(userId);
+
   const now = new Date();
+  const threeDaysAhead = new Date(now.getTime() + THREE_DAYS_MS);
 
-  // Prefer cards due now; fall back to any unreviewed card so first-time users see something.
-  const due = await prisma.card.findFirst({
-    where: { userId, dueAt: { lte: now } },
-    orderBy: { dueAt: "asc" },
-    include: { problem: true },
-  });
-
-  const dueCount = await prisma.card.count({ where: { userId, dueAt: { lte: now } } });
-  const totalCount = await prisma.card.count({ where: { userId } });
-
-  if (!due) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-semibold tracking-tight">All caught up</h1>
-        <p className="text-neutral-600 dark:text-neutral-400">
-          No cards due right now. You have {totalCount} card{totalCount === 1 ? "" : "s"} scheduled.
-        </p>
-        <Link
-          href="/"
-          className="inline-block rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
-        >
-          Home
-        </Link>
-      </div>
-    );
+  let card;
+  if (ahead > 0) {
+    // Due-soon picker
+    card = await prisma.card.findFirst({
+      where: {
+        userId,
+        dueAt: { gt: now, lte: threeDaysAhead },
+        id: { notIn: skipped },
+      },
+      orderBy: [{ dueAt: "asc" }, { id: "asc" }],
+      include: { problem: true },
+    });
+  } else {
+    // Due picker (force=1 ignores cap; default also picks one — cap is enforced by /today)
+    card = await prisma.card.findFirst({
+      where: { userId, dueAt: { lte: now }, id: { notIn: skipped } },
+      orderBy: [{ dueAt: "asc" }, { id: "asc" }],
+      include: { problem: true },
+    });
   }
+
+  if (!card) redirect("/today");
+
+  // Counts for header context
+  const dueCount = await prisma.card.count({ where: { userId, dueAt: { lte: now } } });
 
   return (
     <div className="space-y-6">
       <header className="flex items-baseline justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Review</h1>
-        <span className="text-xs text-neutral-500">
-          {dueCount} due · {totalCount} total
-        </span>
+        <h1 className="text-xl font-semibold tracking-tight">
+          {ahead > 0 ? "Review ahead" : "Review"}
+        </h1>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-neutral-500">
+            {ahead > 0 ? "due soon" : `${dueCount} due`}
+          </span>
+          <UndoButton />
+        </div>
       </header>
+
+      {sp.error === "cant_undo" && (
+        <p className="text-sm text-amber-600 dark:text-amber-400">
+          Nothing to undo within the last 30 seconds.
+        </p>
+      )}
+      {sp.error === "rate_limited" && (
+        <p className="text-sm text-red-600 dark:text-red-400">
+          Too many actions. Slow down for a moment.
+        </p>
+      )}
+
       <ReviewCard
         card={{
-          id: due.id,
-          intervalDays: due.intervalDays,
-          reps: due.reps,
+          id: card.id,
+          intervalDays: card.intervalDays,
+          reps: card.reps,
           problem: {
-            title: due.problem.title,
-            source: due.problem.source,
-            url: due.problem.url,
-            prompt: due.problem.prompt,
-            approach: due.problem.approach,
-            tags: due.problem.tags,
+            title: card.problem.title,
+            source: card.problem.source,
+            url: card.problem.url,
+            prompt: card.problem.prompt,
+            approach: card.problem.approach,
+            tags: card.problem.tags,
           },
         }}
+        force={force}
+        ahead={ahead}
       />
     </div>
   );

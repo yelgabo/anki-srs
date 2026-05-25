@@ -10,18 +10,21 @@ datasource db {
 // --- NextAuth (Auth.js v5) Prisma adapter models ---
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  emailVerified DateTime?
-  image         String?
-  passwordHash  String?
-  createdAt     DateTime  @default(now())
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  emailVerified  DateTime?
+  image          String?
+  passwordHash   String?
+  timezone       String    @default("UTC")
+  dailyReviewCap Int       @default(50)
+  createdAt      DateTime  @default(now())
 
-  accounts Account[]
-  sessions Session[]
-  cards    Card[]
-  reviews  ReviewLog[]
+  accounts      Account[]
+  sessions      Session[]
+  cards         Card[]
+  reviews       ReviewLog[]
+  streakFreezes StreakFreeze[]
 }
 
 model Account {
@@ -78,19 +81,20 @@ model Problem {
 }
 
 model Card {
-  id        String   @id @default(cuid())
-  userId    String
-  problemId String
+  id             String    @id @default(cuid())
+  userId         String
+  problemId      String
   // SM-2 state.
-  ease      Float    @default(2.5)
-  intervalDays Float @default(0)
-  reps      Int      @default(0)
-  lapses    Int      @default(0)
-  dueAt     DateTime @default(now())
+  ease           Float     @default(2.5)
+  intervalDays   Float     @default(0)
+  reps           Int       @default(0)
+  lapses         Int       @default(0)
+  dueAt          DateTime  @default(now())
   lastReviewedAt DateTime?
+  leech          Boolean   @default(false)
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem     @relation(fields: [problemId], references: [id], onDelete: Cascade)
   reviews ReviewLog[]
 
   @@unique([userId, problemId])
@@ -98,18 +102,33 @@ model Card {
 }
 
 model ReviewLog {
-  id            String   @id @default(cuid())
-  cardId        String
-  userId        String
-  grade         Int      // 0=Again, 1=Hard, 2=Good, 3=Easy
-  prevInterval  Float
-  newInterval   Float
-  prevEase      Float
-  newEase       Float
-  reviewedAt    DateTime @default(now())
+  id                 String    @id @default(cuid())
+  cardId             String
+  userId             String
+  grade              Int // 0=Again, 1=Hard, 2=Good, 3=Easy
+  prevInterval       Float
+  newInterval        Float
+  prevEase           Float
+  newEase            Float
+  prevReps           Int       @default(0)
+  prevLapses         Int       @default(0)
+  prevLastReviewedAt DateTime?
+  reviewedAt         DateTime  @default(now())
 
   card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, reviewedAt])
+}
+
+model StreakFreeze {
+  id        String   @id @default(cuid())
+  userId    String
+  usedOn    DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, usedOn])
+  @@index([userId, usedOn])
 }
