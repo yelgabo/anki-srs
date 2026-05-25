@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- NextAuth (Auth.js v5) Prisma adapter models ---
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+
+  accounts Account[]
+  sessions Session[]
+  cards    Card[]
+  reviews  ReviewLog[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// --- Domain models ---
+
+model Problem {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  source    String
+  url       String?
+  // Prompt the user sees first.
+  prompt    String   @db.Text
+  // Approach/answer shown after self-recall.
+  approach  String   @db.Text
+  tags      String[]
+  createdAt DateTime @default(now())
+
+  cards Card[]
+}
+
+model Card {
+  id        String   @id @default(cuid())
+  userId    String
+  problemId String
+  // SM-2 state.
+  ease      Float    @default(2.5)
+  intervalDays Float @default(0)
+  reps      Int      @default(0)
+  lapses    Int      @default(0)
+  dueAt     DateTime @default(now())
+  lastReviewedAt DateTime?
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  reviews ReviewLog[]
+
+  @@unique([userId, problemId])
+  @@index([userId, dueAt])
+}
+
+model ReviewLog {
+  id            String   @id @default(cuid())
+  cardId        String
+  userId        String
+  grade         Int      // 0=Again, 1=Hard, 2=Good, 3=Easy
+  prevInterval  Float
+  newInterval   Float
+  prevEase      Float
+  newEase       Float
+  reviewedAt    DateTime @default(now())
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, reviewedAt])
+}
