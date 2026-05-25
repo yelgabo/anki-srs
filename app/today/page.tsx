@@ -28,7 +28,6 @@ export default async function TodayPage() {
   const now = new Date();
   const threeDaysAhead = new Date(now.getTime() + THREE_DAYS_MS);
 
-  // Due counts
   const dueRowsCount = await prisma.card.count({
     where: { userId, dueAt: { lte: now } },
   });
@@ -36,22 +35,18 @@ export default async function TodayPage() {
   const dueCount = Math.min(dueRowsCount, cap);
   const excessDue = Math.max(0, dueRowsCount - cap);
 
-  // Due-soon (next 3 days)
   const dueSoonCount = await prisma.card.count({
     where: { userId, dueAt: { gt: now, lte: threeDaysAhead } },
   });
 
-  // Next due (any future)
   const nextDue = await prisma.card.findFirst({
     where: { userId, dueAt: { gt: now } },
     orderBy: { dueAt: "asc" },
     select: { dueAt: true },
   });
 
-  // Has any card at all?
   const hasAnyCards = (await prisma.card.count({ where: { userId } })) > 0;
 
-  // Streak — actual + projected
   const reviewDayRows = await prisma.$queryRaw<{ d: Date }[]>`
     SELECT DISTINCT (date_trunc('day', "reviewedAt" AT TIME ZONE ${tz}))::date AS d
     FROM "ReviewLog"
@@ -77,16 +72,24 @@ export default async function TodayPage() {
     assumeActiveDays: [todayKey],
   });
 
+  const projectedHint =
+    projected.daily > actual.daily
+      ? projected.freezesUsedThisMonth > actual.freezesUsedThisMonth
+        ? "+1 today (auto-freeze)"
+        : "+1 today"
+      : null;
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 sm:space-y-10">
       <TimezoneCapture />
 
-      <header className="flex items-baseline justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Today</h1>
-          <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-            Signed in as <span className="font-mono">{session.user.email}</span>
-          </p>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="label">anki / srs</span>
+          <span className="label text-fg-4">·</span>
+          <span className="label normal-case tracking-normal text-fg-3 font-sans text-xs">
+            {session.user.email}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <UndoButton />
@@ -98,7 +101,7 @@ export default async function TodayPage() {
           >
             <button
               type="submit"
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+              className="h-9 rounded-lg border border-border bg-surface px-3 text-xs text-fg-2 hover:border-border-hi hover:text-fg transition-colors"
             >
               Sign out
             </button>
@@ -106,53 +109,51 @@ export default async function TodayPage() {
         </div>
       </header>
 
-      {/* Streak chips */}
-      <section className="flex flex-wrap gap-3">
-        <Chip
-          label="Daily streak"
-          value={actual.daily}
-          hint={
-            projected.daily > actual.daily
-              ? projected.freezesUsedThisMonth > actual.freezesUsedThisMonth
-                ? "+1 with auto-freeze if you review today"
-                : "+1 if you review today"
-              : undefined
-          }
-        />
-        <Chip
-          label="Weekly"
-          value={`${actual.daysThisWeek}/5`}
-          hint={actual.weekly > 0 ? `${actual.weekly}-week streak` : undefined}
-        />
-        {actual.longest > 0 && (
-          <Chip label="Longest" value={actual.longest} />
-        )}
+      {/* Stats — stack on mobile, 3-col on sm+ */}
+      <section className="grid grid-cols-3 gap-2 sm:gap-3">
+        <Stat label="Daily" value={actual.daily} suffix="days" highlight={projectedHint !== null} />
+        <Stat label="This week" value={`${actual.daysThisWeek}/5`} suffix={actual.weekly > 0 ? `${actual.weekly}wk streak` : "this week"} />
+        <Stat label="Longest" value={actual.longest} suffix="days" muted />
       </section>
 
-      {/* Main CTA — session or done state */}
+      {projectedHint && (
+        <div className="-mt-4 sm:-mt-6 rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm text-accent">
+          {projectedHint} — review a card to lock it in.
+        </div>
+      )}
+
+      {/* Primary CTA */}
       {dueCount > 0 ? (
-        <section className="space-y-4 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <section className="space-y-5 rounded-lg border border-border bg-surface p-5 sm:p-7">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight">
-              {dueCount} due now
-            </h2>
-            {excessDue > 0 && (
-              <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-                +{excessDue} more queued by your daily cap of {cap}.{" "}
-                <Link href="/review?force=1" className="underline">
-                  Review them anyway →
-                </Link>
-              </p>
-            )}
+            <p className="label">Today</p>
+            <p className="mt-2 text-4xl sm:text-5xl font-semibold tracking-tight">
+              <span className="mono tabular">{dueCount}</span>
+              <span className="text-fg-3 font-normal text-2xl sm:text-3xl ml-2">due</span>
+            </p>
           </div>
+
           <form action={startSessionAction}>
             <button
               type="submit"
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+              className="flex h-12 w-full sm:w-auto items-center justify-center rounded-lg bg-accent px-6 font-medium text-accent-fg hover:bg-accent-hover transition-colors"
             >
               Start session →
             </button>
           </form>
+
+          {excessDue > 0 && (
+            <p className="text-sm text-fg-3">
+              +<span className="mono tabular">{excessDue}</span> more queued by your
+              cap of <span className="mono tabular">{cap}</span>.{" "}
+              <Link
+                href="/review?force=1"
+                className="text-accent hover:underline whitespace-nowrap"
+              >
+                Review them anyway →
+              </Link>
+            </p>
+          )}
         </section>
       ) : (
         <DoneState
@@ -163,27 +164,49 @@ export default async function TodayPage() {
           now={now}
         />
       )}
+
+      <footer className="pt-6 mt-4 border-t border-border">
+        <p className="mono text-xs text-fg-4 tabular">
+          {todayKey} · {tz}
+        </p>
+      </footer>
     </div>
   );
 }
 
-function Chip({
+function Stat({
   label,
   value,
-  hint,
+  suffix,
+  highlight = false,
+  muted = false,
 }: {
   label: string;
   value: number | string;
-  hint?: string;
+  suffix?: string;
+  highlight?: boolean;
+  muted?: boolean;
 }) {
   return (
-    <div className="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm dark:border-neutral-800 dark:bg-neutral-900">
-      <div className="text-xs uppercase tracking-wide text-neutral-500">{label}</div>
-      <div className="font-mono text-lg">{value}</div>
-      {hint && (
-        <div className="mt-0.5 text-[10px] text-neutral-500 dark:text-neutral-400">
-          {hint}
-        </div>
+    <div
+      className={
+        "rounded-lg border p-3 sm:p-4 " +
+        (highlight
+          ? "border-accent/40 bg-accent/5"
+          : "border-border bg-surface")
+      }
+    >
+      <p className="label">{label}</p>
+      <p
+        className={
+          "mt-1.5 sm:mt-2 mono tabular font-semibold leading-none " +
+          (muted ? "text-2xl sm:text-3xl text-fg-2" : "text-2xl sm:text-4xl text-fg")
+        }
+      >
+        {value}
+      </p>
+      {suffix && (
+        <p className="mt-1 text-[10px] sm:text-xs text-fg-3 truncate">{suffix}</p>
       )}
     </div>
   );
@@ -211,12 +234,17 @@ function DoneState({
   });
 
   return (
-    <section className="space-y-4 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-      <h2 className="text-xl font-semibold tracking-tight">{state.copy}</h2>
+    <section className="space-y-5 rounded-lg border border-border bg-surface p-5 sm:p-7">
+      <div>
+        <p className="label">Today</p>
+        <p className="mt-2 text-2xl sm:text-3xl font-semibold tracking-tight leading-snug">
+          {state.copy}
+        </p>
+      </div>
       {state.showDueSoonCta && (
         <Link
           href={`/review?ahead=${Math.min(5, dueSoonCount)}`}
-          className="inline-block rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+          className="inline-flex h-12 w-full sm:w-auto items-center justify-center rounded-lg border border-border-hi bg-surface-2 px-6 font-medium text-fg hover:border-accent hover:text-accent transition-colors"
         >
           Review {Math.min(5, dueSoonCount)} due soon →
         </Link>

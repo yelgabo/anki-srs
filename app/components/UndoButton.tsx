@@ -19,9 +19,10 @@ export default async function UndoButton() {
       <button
         type="submit"
         title="Undo your most recent grade (within 30s)"
-        className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+        className="h-9 rounded-lg border border-border bg-surface px-3 text-xs text-fg-2 hover:border-accent hover:text-accent transition-colors flex items-center gap-1.5"
       >
-        ↶ Undo
+        <span aria-hidden>↶</span>
+        <span>Undo</span>
       </button>
     </form>
   );

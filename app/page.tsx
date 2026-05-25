@@ -11,26 +11,31 @@ export default async function Home() {
   const problemCount = await prisma.problem.count();
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Anki SRS</h1>
-        <p className="mt-2 text-neutral-600 dark:text-neutral-400">
-          Spaced repetition for coding interview problems. {problemCount} problems seeded.
+    <div className="space-y-10 sm:space-y-14">
+      <header className="space-y-4">
+        <p className="label">anki / srs</p>
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold leading-[1.1] tracking-tight max-w-wide">
+          Spaced repetition for{" "}
+          <span className="text-accent">coding interview</span> problems.
+        </h1>
+        <p className="text-fg-2 text-base sm:text-lg max-w-column leading-relaxed">
+          {problemCount} NeetCode problems, scheduled with SM-2. Daily streak with
+          auto-freezes. Keyboard shortcuts. Works on your phone on the train.
         </p>
       </header>
 
-      <div className="flex gap-3">
-        <Link
-          href="/signin"
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-        >
-          Sign in
-        </Link>
+      <div className="flex flex-col sm:flex-row gap-3">
         <Link
           href="/signup"
-          className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+          className="flex h-12 items-center justify-center rounded-lg bg-accent px-6 font-medium text-accent-fg hover:bg-accent-hover transition-colors"
         >
-          Sign up
+          Create account
+        </Link>
+        <Link
+          href="/signin"
+          className="flex h-12 items-center justify-center rounded-lg border border-border bg-surface px-6 font-medium text-fg hover:border-border-hi transition-colors"
+        >
+          Sign in
         </Link>
       </div>
     </div>

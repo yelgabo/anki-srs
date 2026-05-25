@@ -2,16 +2,141 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────── Design tokens — STATION ────────────────
+ * Dark-first, sans-only, phosphor-green accent.
+ * Every interactive element has a visible tap affordance.
+ */
+
 :root {
-  color-scheme: light dark;
+  color-scheme: dark light;
+
+  /* Surface (dark default) */
+  --bg:           #0A0D14;
+  --surface:      #11151E;
+  --surface-2:    #1A1F2B;
+  --border:       #232936;
+  --border-hi:    #2F3645;
+
+  /* Text */
+  --fg:           #ECEEF3;
+  --fg-2:         #B4BAC7;
+  --fg-3:         #7A8597;
+  --fg-4:         #4D5666;
+
+  /* Accent — phosphor green */
+  --accent:       #39E08E;
+  --accent-hover: #4FE89C;
+  --accent-fg:    #04140A;
+  --accent-dim:   #1F7A4D;
+  --accent-glow:  rgba(57, 224, 142, 0.18);
+
+  /* Critical (errors, warnings) */
+  --warn:         #FFB546;
+  --danger:       #FF6B6B;
+
+  /* Grade scale — cool gray → warm amber, dark theme */
+  --grade-1: #1A1F2B;   --grade-1-hi: #232936;
+  --grade-2: #1F2330;   --grade-2-hi: #29303E;
+  --grade-3: #25283A;   --grade-3-hi: #30354A;
+  --grade-4: #2C2D44;   --grade-4-hi: #393A55;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:           #F4F5F7;
+    --surface:      #FFFFFF;
+    --surface-2:    #ECEFF3;
+    --border:       #DCE0E6;
+    --border-hi:    #BFC5CF;
+
+    --fg:           #0F1219;
+    --fg-2:         #424857;
+    --fg-3:         #6A7283;
+    --fg-4:         #97A0B0;
+
+    --accent:       #0E9A5D;
+    --accent-hover: #0B7F4D;
+    --accent-fg:    #FFFFFF;
+    --accent-dim:   #C2F0DA;
+    --accent-glow:  rgba(14, 154, 93, 0.14);
+
+    --warn:         #C77A14;
+    --danger:       #C5363B;
+
+    --grade-1: #ECEFF3;  --grade-1-hi: #DDE3EB;
+    --grade-2: #ECEFF0;  --grade-2-hi: #DDE2E4;
+    --grade-3: #ECEEEC;  --grade-3-hi: #DDE3DD;
+    --grade-4: #EEEDEA;  --grade-4-hi: #E0DDD5;
+  }
+}
+
+* {
+  box-sizing: border-box;
 }
 
 html, body {
-  @apply bg-neutral-50 text-neutral-900;
+  background-color: var(--bg);
+  color: var(--fg);
 }
 
-@media (prefers-color-scheme: dark) {
-  html, body {
-    @apply bg-neutral-950 text-neutral-100;
-  }
+body {
+  font-family: var(--font-sans, system-ui), sans-serif;
+  font-feature-settings: "ss01", "cv01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular numerals + monospace for stats. */
+.mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-feature-settings: "tnum", "zero";
+}
+.tabular {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Labels: a small caps tracked pattern, used everywhere. */
+.label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--fg-3);
+}
+
+/* Reveal animation for approach + grade row */
+@keyframes lift-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.lift-in {
+  animation: lift-in 220ms cubic-bezier(.22, .61, .36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lift-in { animation: none; }
+}
+
+/* Subtle phosphor glow on primary action */
+.accent-glow {
+  box-shadow: 0 0 0 1px var(--accent), 0 6px 24px -8px var(--accent-glow);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* iOS / mobile: prevent zoom-on-focus by keeping inputs ≥16px */
+input, textarea, select, button {
+  font-size: max(1rem, 16px);
 }

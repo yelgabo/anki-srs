@@ -21,12 +21,13 @@ interface Props {
   ahead?: number;
 }
 
-const BUTTONS: { grade: 0 | 1 | 2 | 3; key: string; label: string; hint: string; className: string }[] = [
-  { grade: 0, key: "1", label: "Again", hint: "1·<1d", className: "bg-red-600 hover:bg-red-500 text-white focus:ring-red-300" },
-  { grade: 1, key: "2", label: "Hard", hint: "2·soon", className: "bg-amber-500 hover:bg-amber-400 text-white focus:ring-amber-300" },
-  { grade: 2, key: "3", label: "Good", hint: "3·ok", className: "bg-emerald-600 hover:bg-emerald-500 text-white focus:ring-emerald-300" },
-  { grade: 3, key: "4", label: "Easy", hint: "4·long", className: "bg-sky-600 hover:bg-sky-500 text-white focus:ring-sky-300" },
-];
+// Grade buttons: numeral-first identity, quiet cool→warm temperature gradient.
+const BUTTONS = [
+  { grade: 0, key: "1", label: "Again", hint: "lapse",  v: "1" },
+  { grade: 1, key: "2", label: "Hard",  hint: "soon",   v: "2" },
+  { grade: 2, key: "3", label: "Good",  hint: "steady", v: "3" },
+  { grade: 3, key: "4", label: "Easy",  hint: "longer", v: "4" },
+] as const;
 
 const HINTS_KEY = "shortcut-hints-seen";
 const HINT_SESSIONS = 3;
@@ -54,7 +55,6 @@ export default function ReviewCard({ card }: Props) {
         hintsBumped.current = true;
       }
     } catch {
-      /* localStorage unavailable; show hints anyway */
       setShowHints(true);
     }
   }, []);
@@ -78,13 +78,11 @@ export default function ReviewCard({ card }: Props) {
     });
   };
 
-  // Keyboard handler — scoped preventDefault only on handled keys.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       const k = e.key;
 
-      // Space → reveal
       if (k === " " || k === "Spacebar") {
         if (!revealed) {
           e.preventDefault();
@@ -92,20 +90,15 @@ export default function ReviewCard({ card }: Props) {
         }
         return;
       }
-
-      // Skip (works before or after reveal)
       if (k === "s" || k === "S") {
         e.preventDefault();
         if (!pending) skip();
         return;
       }
-
-      // Grades — only post-reveal
       if (revealed && (k === "1" || k === "2" || k === "3" || k === "4")) {
         e.preventDefault();
         const g = (Number(k) - 1) as 0 | 1 | 2 | 3;
         if (!pending) grade(g);
-        return;
       }
     }
     window.addEventListener("keydown", onKey);
@@ -114,85 +107,109 @@ export default function ReviewCard({ card }: Props) {
   }, [revealed, pending]);
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">{card.problem.title}</h2>
-          <span className="text-xs text-neutral-500">{card.problem.source}</span>
-        </div>
-        {card.problem.tags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {card.problem.tags.map((t) => (
-              <span
-                key={t}
-                className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-              >
-                {t}
-              </span>
-            ))}
+    <article className="space-y-6 sm:space-y-8">
+      {/* Card panel */}
+      <div className="rounded-lg border border-border bg-surface overflow-hidden">
+        {/* Header */}
+        <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-border space-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="label">{card.problem.source}</span>
+            {card.problem.tags.length > 0 && (
+              <>
+                <span className="label text-fg-4">·</span>
+                <span className="text-xs text-fg-3 truncate">
+                  {card.problem.tags.join(", ")}
+                </span>
+              </>
+            )}
           </div>
-        )}
-        <p className="mt-4 whitespace-pre-wrap text-[0.95rem] leading-relaxed">
-          {card.problem.prompt}
-        </p>
-        {card.problem.url && (
-          <a
-            href={card.problem.url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-block text-xs text-neutral-500 underline hover:text-neutral-700 dark:hover:text-neutral-300"
-          >
-            Open on source site ↗
-          </a>
-        )}
-      </div>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight leading-snug">
+            {card.problem.title}
+          </h1>
+        </div>
 
-      {!revealed ? (
-        <button
-          onClick={() => setRevealed(true)}
-          className="w-full rounded-md border border-neutral-300 bg-white px-4 py-3 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
-        >
-          Show approach{showHints && <span className="ml-2 text-xs text-neutral-500">Space</span>}
-        </button>
-      ) : (
-        <>
-          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-6 dark:border-neutral-800 dark:bg-neutral-900/60">
-            <h3 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-              Approach
-            </h3>
-            <p className="mt-2 whitespace-pre-wrap text-[0.95rem] leading-relaxed">
+        {/* Prompt */}
+        <div className="px-4 sm:px-6 py-5 sm:py-6 space-y-4">
+          <p className="text-base sm:text-[17px] leading-[1.65] text-fg whitespace-pre-wrap">
+            {card.problem.prompt}
+          </p>
+          {card.problem.url && (
+            <a
+              href={card.problem.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-fg-3 hover:text-accent transition-colors"
+            >
+              <span>Open on source</span>
+              <span aria-hidden>↗</span>
+            </a>
+          )}
+        </div>
+
+        {/* Approach (revealed) */}
+        {revealed && (
+          <div className="lift-in px-4 sm:px-6 py-5 sm:py-6 border-t border-border bg-surface-2 space-y-3">
+            <p className="label text-accent">Approach</p>
+            <p className="text-base sm:text-[17px] leading-[1.65] text-fg whitespace-pre-wrap">
               {card.problem.approach}
             </p>
           </div>
+        )}
+      </div>
 
-          <div className="grid grid-cols-4 gap-2">
-            {BUTTONS.map((b) => (
-              <button
-                key={b.grade}
-                disabled={pending}
-                onClick={() => grade(b.grade)}
-                className={`rounded-md px-3 py-3 text-sm font-medium disabled:opacity-60 focus:outline-none focus:ring-2 ${b.className}`}
-              >
-                <div>{b.label}</div>
-                {showHints && <div className="text-[10px] opacity-80">{b.hint}</div>}
-              </button>
-            ))}
-          </div>
-        </>
+      {/* Reveal CTA or Grade row */}
+      {!revealed ? (
+        <button
+          type="button"
+          onClick={() => setRevealed(true)}
+          className="flex h-14 w-full items-center justify-center gap-3 rounded-lg bg-accent px-6 font-medium text-accent-fg hover:bg-accent-hover transition-colors"
+        >
+          <span>Show approach</span>
+          {showHints && (
+            <span className="mono text-xs px-1.5 py-0.5 rounded bg-accent-fg/10 text-accent-fg/70">
+              space
+            </span>
+          )}
+        </button>
+      ) : (
+        <div className="lift-in grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          {BUTTONS.map((b) => (
+            <button
+              key={b.grade}
+              disabled={pending}
+              onClick={() => grade(b.grade)}
+              style={{
+                background: `var(--grade-${b.v})`,
+                ["--hover-bg" as string]: `var(--grade-${b.v}-hi)`,
+              }}
+              className="group flex flex-col items-start gap-1.5 rounded-lg border border-border min-h-[88px] px-4 py-3 text-left transition-colors disabled:opacity-60 hover:border-accent hover:[background:var(--hover-bg)] active:scale-[0.98]"
+            >
+              <span className="mono text-2xl font-semibold tabular text-fg">{b.key}</span>
+              <span>
+                <span className="block text-sm font-medium text-fg leading-tight">{b.label}</span>
+                <span className="block text-[11px] text-fg-3 mt-0.5">{b.hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
       )}
 
-      <div className="flex items-center justify-between text-xs text-neutral-500">
-        <span>
-          reps {card.reps} · interval {card.intervalDays.toFixed(1)}d
+      {/* Footer */}
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <span className="mono text-xs text-fg-4 tabular">
+          reps {card.reps} · {card.intervalDays.toFixed(1)}d
         </span>
         <button
           onClick={skip}
           disabled={pending}
-          className="rounded border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
+          className="h-9 rounded-lg border border-border bg-surface px-3 text-xs text-fg-2 hover:border-border-hi hover:text-fg transition-colors disabled:opacity-50 flex items-center gap-2"
         >
-          Skip{showHints && <span className="ml-1 opacity-70">s</span>}
+          <span>Skip</span>
+          {showHints && (
+            <span className="mono px-1 py-0.5 rounded bg-surface-2 text-fg-3 text-[10px]">s</span>
+          )}
         </button>
       </div>
-    </div>
+    </article>
   );
 }

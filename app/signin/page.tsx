@@ -9,69 +9,85 @@ export default async function SignInPage({
   const sp = await searchParams;
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
-        <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-          Email and password.
-        </p>
+    <div className="max-w-column space-y-8">
+      <header className="space-y-3">
+        <Link href="/" className="label hover:text-accent transition-colors">
+          ← anki / srs
+        </Link>
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Sign in</h1>
       </header>
 
-      {sp.error && (
-        <p className="text-sm text-red-600 dark:text-red-400">{errorMessage(sp.error)}</p>
-      )}
+      {sp.error && <ErrorBanner code={sp.error} />}
 
-      <form action={signinAction} className="space-y-4">
-        <label className="block">
-          <span className="block text-sm font-medium">Email</span>
-          <input
-            name="email"
-            type="email"
-            required
-            autoFocus
-            autoComplete="email"
-            className="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-900"
-            placeholder="you@example.com"
-          />
-        </label>
-
-        <label className="block">
-          <span className="block text-sm font-medium">Password</span>
-          <input
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            maxLength={128}
-            className="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 dark:border-neutral-700 dark:bg-neutral-900"
-          />
-        </label>
+      <form action={signinAction} className="space-y-5">
+        <Field name="email" label="Email" type="email" autoComplete="email" autoFocus />
+        <Field name="password" label="Password" type="password" autoComplete="current-password" maxLength={128} />
 
         <button
           type="submit"
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+          className="flex h-12 w-full items-center justify-center rounded-lg bg-accent px-6 font-medium text-accent-fg hover:bg-accent-hover transition-colors"
         >
-          Continue →
+          Continue
         </button>
       </form>
 
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+      <p className="text-sm text-fg-3">
         No account?{" "}
-        <Link href="/signup" className="underline">
-          Sign up
+        <Link href="/signup" className="text-accent hover:underline">
+          Create one
         </Link>
       </p>
     </div>
   );
 }
 
-function errorMessage(code: string): string {
-  switch (code) {
-    case "invalid_credentials":
-      return "Invalid email or password.";
-    case "rate_limited":
-      return "Too many attempts. Try again in a few minutes.";
-    default:
-      return "Could not sign in.";
-  }
+function Field({
+  name,
+  label,
+  type,
+  autoComplete,
+  autoFocus,
+  maxLength,
+  minLength,
+  hint,
+}: {
+  name: string;
+  label: string;
+  type: string;
+  autoComplete?: string;
+  autoFocus?: boolean;
+  maxLength?: number;
+  minLength?: number;
+  hint?: string;
+}) {
+  return (
+    <label className="block space-y-2">
+      <span className="label">{label}</span>
+      <input
+        name={name}
+        type={type}
+        required
+        autoFocus={autoFocus}
+        autoComplete={autoComplete}
+        maxLength={maxLength}
+        minLength={minLength}
+        className="block h-12 w-full rounded-lg border border-border bg-surface px-4 text-fg placeholder:text-fg-4 focus:border-accent focus:outline-none transition-colors"
+      />
+      {hint && <span className="block text-xs text-fg-3">{hint}</span>}
+    </label>
+  );
+}
+
+function ErrorBanner({ code }: { code: string }) {
+  const message =
+    code === "invalid_credentials"
+      ? "Invalid email or password."
+      : code === "rate_limited"
+      ? "Too many attempts. Try again in a few minutes."
+      : "Could not sign in.";
+  return (
+    <p className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+      {message}
+    </p>
+  );
 }

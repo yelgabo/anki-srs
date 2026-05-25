@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -30,7 +31,6 @@ export default async function ReviewPage({ searchParams }: { searchParams: Searc
 
   let card;
   if (ahead > 0) {
-    // Due-soon picker
     card = await prisma.card.findFirst({
       where: {
         userId,
@@ -41,7 +41,6 @@ export default async function ReviewPage({ searchParams }: { searchParams: Searc
       include: { problem: true },
     });
   } else {
-    // Due picker (force=1 ignores cap; default also picks one — cap is enforced by /today)
     card = await prisma.card.findFirst({
       where: { userId, dueAt: { lte: now }, id: { notIn: skipped } },
       orderBy: [{ dueAt: "asc" }, { id: "asc" }],
@@ -51,30 +50,29 @@ export default async function ReviewPage({ searchParams }: { searchParams: Searc
 
   if (!card) redirect("/today");
 
-  // Counts for header context
   const dueCount = await prisma.card.count({ where: { userId, dueAt: { lte: now } } });
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">
-          {ahead > 0 ? "Review ahead" : "Review"}
-        </h1>
+    <div className="space-y-6 sm:space-y-8">
+      <header className="flex items-center justify-between gap-3">
+        <Link href="/today" className="label hover:text-accent transition-colors">
+          ← back
+        </Link>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-neutral-500">
-            {ahead > 0 ? "due soon" : `${dueCount} due`}
+          <span className="mono text-xs text-fg-3 tabular">
+            {ahead > 0 ? `ahead ${ahead}` : `${dueCount} left`}
           </span>
           <UndoButton />
         </div>
       </header>
 
       {sp.error === "cant_undo" && (
-        <p className="text-sm text-amber-600 dark:text-amber-400">
+        <p className="rounded-lg border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-warn">
           Nothing to undo within the last 30 seconds.
         </p>
       )}
       {sp.error === "rate_limited" && (
-        <p className="text-sm text-red-600 dark:text-red-400">
+        <p className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
           Too many actions. Slow down for a moment.
         </p>
       )}
