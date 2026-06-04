@@ -1,8 +1,6 @@
-import { PrismaClient } from "@prisma/client";
 import { SEED_PROBLEMS } from "../lib/seed-data";
-import { SYSTEM_GROUP_KEY } from "../lib/groups";
-
-const prisma = new PrismaClient();
+import { prisma } from "../lib/db";
+import { SYSTEM_GROUP_KEY, ensureCards } from "../lib/groups";
 
 export async function seedDatabase() {
   // 1. Upsert curated problems by the composite unique (createdById=null, slug).
@@ -44,10 +42,7 @@ export async function seedDatabase() {
   if (activations.length > 0) {
     const problemIds = curated.map((p) => p.id);
     for (const { userId } of activations) {
-      await prisma.card.createMany({
-        data: problemIds.map((problemId) => ({ userId, problemId })),
-        skipDuplicates: true,
-      });
+      await ensureCards(userId, problemIds);
     }
   }
 
