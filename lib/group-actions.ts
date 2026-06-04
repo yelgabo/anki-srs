@@ -171,7 +171,7 @@ export interface EditProblemInput {
 
 export async function editProblem(userId: string, problemId: string, patch: EditProblemInput): Promise<Problem> {
   await assertOwnedProblem(userId, problemId);
-  const data: EditProblemInput & { url?: string | null } = {};
+  const data: { title?: string; prompt?: string; approach?: string; tags?: string[]; url?: string | null } = {};
   if (patch.title !== undefined) {
     const t = patch.title.trim();
     if (t.length === 0) throw new GroupError("invalid_problem", "title required");

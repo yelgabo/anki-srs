@@ -92,6 +92,12 @@ describe("assertStudyableGroup", () => {
     const g = await ownedGroup(a.id);
     await expect(assertStudyableGroup(b.id, g.id)).rejects.toMatchObject({ code: "forbidden" });
   });
+
+  it("allows a system SHARED group (ownerId null) for any user", async () => {
+    const u = await makeUser();
+    const sys = await prisma.group.create({ data: { ownerId: null, visibility: "SHARED", name: "Sys" } });
+    expect((await assertStudyableGroup(u.id, sys.id)).id).toBe(sys.id);
+  });
 });
 
 describe("isGroupActive", () => {
@@ -149,6 +155,7 @@ describe("renameGroup", () => {
     const b = await makeUser();
     const g = await createGroup(a.id, "A");
     await expect(renameGroup(b.id, g.id, { name: "hax" })).rejects.toMatchObject({ code: "forbidden" });
+    expect((await prisma.group.findUnique({ where: { id: g.id } }))!.name).toBe("A");
   });
 });
 
@@ -171,6 +178,14 @@ describe("deleteGroup", () => {
     const u = await makeUser();
     const sys = await prisma.group.create({ data: { ownerId: null, visibility: "SHARED", name: "Sys" } });
     await expect(deleteGroup(u.id, sys.id)).rejects.toMatchObject({ code: "forbidden" });
+  });
+
+  it("refuses to delete another user's group (IDOR) and leaves it intact", async () => {
+    const a = await makeUser();
+    const b = await makeUser();
+    const g = await createGroup(a.id, "A");
+    await expect(deleteGroup(b.id, g.id)).rejects.toMatchObject({ code: "forbidden" });
+    expect(await prisma.group.findUnique({ where: { id: g.id } })).not.toBeNull();
   });
 });
 
@@ -325,6 +340,7 @@ describe("removeProblemFromGroup", () => {
     const p = await makeProblem("c", null);
     await prisma.groupProblem.create({ data: { groupId: g.id, problemId: p.id } });
     await expect(removeProblemFromGroup(b.id, g.id, p.id)).rejects.toMatchObject({ code: "forbidden" });
+    expect(await prisma.groupProblem.count({ where: { groupId: g.id, problemId: p.id } })).toBe(1);
   });
 });
 
@@ -362,6 +378,8 @@ describe("createProblemInGroup", () => {
     await expect(
       createProblemInGroup(b.id, g.id, { title: "Q", prompt: "p", approach: "a", tags: [] }),
     ).rejects.toMatchObject({ code: "forbidden" });
+    expect(await prisma.problem.count({ where: { createdById: b.id } })).toBe(0);
+    expect(await prisma.groupProblem.count({ where: { groupId: g.id } })).toBe(0);
   });
 
   it("rejects a blank title", async () => {
@@ -401,16 +419,18 @@ describe("editProblem", () => {
     expect(updated.prompt).toBe("np");
   });
 
-  it("refuses to edit a curated problem", async () => {
+  it("refuses to edit a curated problem and leaves it unchanged", async () => {
     const u = await makeUser();
     const p = await makeProblem("curated", null);
     await expect(editProblem(u.id, p.id, { title: "hax" })).rejects.toMatchObject({ code: "forbidden" });
+    expect((await prisma.problem.findUnique({ where: { id: p.id } }))!.title).toBe("curated");
   });
 
-  it("refuses to edit another user's authored problem", async () => {
+  it("refuses to edit another user's authored problem and leaves it unchanged", async () => {
     const a = await makeUser();
     const b = await makeUser();
     const p = await makeProblem("theirs", a.id);
     await expect(editProblem(b.id, p.id, { title: "hax" })).rejects.toMatchObject({ code: "forbidden" });
+    expect((await prisma.problem.findUnique({ where: { id: p.id } }))!.title).toBe("theirs");
   });
 });
