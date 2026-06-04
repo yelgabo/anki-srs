@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/db";
-import { ensureCards, createUserWithDefaultGroup, SYSTEM_GROUP_KEY } from "./groups";
+import { ensureCards, createUserWithDefaultGroup, selfHealActiveCards, SYSTEM_GROUP_KEY } from "./groups";
 import { seedDatabase } from "@/prisma/seed";
 import { makeUser, makeProblem } from "@/test/db/factory";
 
@@ -48,5 +48,40 @@ describe("createUserWithDefaultGroup", () => {
     const u = await createUserWithDefaultGroup("nogroup@test.local", "hash");
     expect(await prisma.groupActivation.count({ where: { userId: u.id } })).toBe(0);
     expect((await prisma.user.findUnique({ where: { id: u.id } }))!.groupsInitialized).toBe(false);
+  });
+});
+
+describe("selfHealActiveCards", () => {
+  it("creates cards for active-group problems the user is missing", async () => {
+    const u = await makeUser({ groupsInitialized: true });
+    const g = await prisma.group.create({ data: { ownerId: u.id, visibility: "PRIVATE", name: "G" } });
+    await prisma.groupActivation.create({ data: { userId: u.id, groupId: g.id } });
+    // A problem added to the active group AFTER activation, with no card yet.
+    const p = await makeProblem("late-add");
+    await prisma.groupProblem.create({ data: { groupId: g.id, problemId: p.id } });
+    expect(await prisma.card.count({ where: { userId: u.id } })).toBe(0);
+
+    await selfHealActiveCards(u.id, true);
+
+    expect(await prisma.card.count({ where: { userId: u.id, problemId: p.id } })).toBe(1);
+  });
+
+  it("is a no-op for uninitialized (fallback) users", async () => {
+    const u = await makeUser({ groupsInitialized: false });
+    await selfHealActiveCards(u.id, false);
+    expect(await prisma.card.count({ where: { userId: u.id } })).toBe(0);
+  });
+
+  it("does not heal cards for another user's group", async () => {
+    const owner = await makeUser({ groupsInitialized: true });
+    const other = await makeUser({ groupsInitialized: true });
+    const g = await prisma.group.create({ data: { ownerId: owner.id, visibility: "PRIVATE", name: "G" } });
+    await prisma.groupActivation.create({ data: { userId: owner.id, groupId: g.id } });
+    const p = await makeProblem("owned");
+    await prisma.groupProblem.create({ data: { groupId: g.id, problemId: p.id } });
+
+    await selfHealActiveCards(other.id, true);
+
+    expect(await prisma.card.count({ where: { userId: other.id } })).toBe(0);
   });
 });
