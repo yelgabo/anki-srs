@@ -5,16 +5,20 @@ import { defineConfig } from "vitest/config";
 // Repo root (trailing slash), used to mirror tsconfig's "@/*" -> "./*".
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 
+// Scope the alias to "@/" so it never catches scoped npm packages like
+// @prisma/client or @auth/prisma-adapter. Must live on EACH project — vitest
+// resolves projects as independent configs and does not inherit root resolve.
+const resolve = {
+  alias: [{ find: /^@\/(.*)$/, replacement: `${rootDir}$1` }],
+};
+
 export default defineConfig({
-  resolve: {
-    // Scope the alias to "@/" so it never catches scoped npm packages
-    // like @prisma/client or @auth/prisma-adapter.
-    alias: [{ find: /^@\/(.*)$/, replacement: `${rootDir}$1` }],
-  },
+  resolve,
   test: {
     projects: [
       {
         // Pure-function tests — no DB, no setup. The existing lib/*.test.ts.
+        resolve,
         test: {
           name: "unit",
           include: ["lib/**/*.test.ts"],
@@ -24,6 +28,7 @@ export default defineConfig({
       },
       {
         // DB-backed integration tests — *.db.test.ts anywhere.
+        resolve,
         test: {
           name: "db",
           include: ["**/*.db.test.ts"],
