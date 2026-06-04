@@ -16,6 +16,7 @@ import {
   addDays,
 } from "@/lib/timezone";
 import { sign, verify, type SkipPayload } from "@/lib/signed-cookie";
+import { ensureCards as ensureCardsFor, defaultActivationProblemIds } from "@/lib/groups";
 
 const GradeSchema = z.object({
   cardId: z.string().min(1),
@@ -230,27 +231,9 @@ export async function undoAction() {
   revalidatePath("/today");
 }
 
-// ----- ensureCards (unchanged from M1; M2.5 will scope by createdById) -----
-
+// TEMPORARY bridge (removed in T2.2): preserves "all curated cards exist" behavior
+// for the two page loads until they are scoped to active groups.
 export async function ensureCards(userId: string): Promise<void> {
-  const problemIds = (await prisma.problem.findMany({ select: { id: true } })).map((p) => p.id);
-  if (problemIds.length === 0) return;
-
-  const existing = new Set(
-    (
-      await prisma.card.findMany({
-        where: { userId, problemId: { in: problemIds } },
-        select: { problemId: true },
-      })
-    ).map((c) => c.problemId),
-  );
-
-  const missing = problemIds.filter((id) => !existing.has(id));
-  if (missing.length === 0) return;
-
-  await prisma.card.createMany({
-    data: missing.map((problemId) => ({ userId, problemId })),
-    skipDuplicates: true,
-  });
+  await ensureCardsFor(userId, await defaultActivationProblemIds());
 }
 
