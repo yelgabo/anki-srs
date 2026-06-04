@@ -3,13 +3,22 @@ import { prisma } from "../lib/db";
 import { SYSTEM_GROUP_KEY, ensureCards } from "../lib/groups";
 
 export async function seedDatabase() {
-  // 1. Upsert curated problems by the composite unique (createdById=null, slug).
+  // 1. Upsert curated problems in the createdById=NULL namespace.
+  //    Prisma can't upsert/findUnique on the @@unique([createdById, slug]) selector
+  //    when createdById is NULL (SQL NULLs aren't valid unique selectors), so we
+  //    find-then-update/create via a filter. Idempotent; preserves Problem ids so
+  //    existing Cards/ReviewLogs don't cascade-delete.
   for (const p of SEED_PROBLEMS) {
-    await prisma.problem.upsert({
-      where: { createdById_slug: { createdById: null, slug: p.slug } },
-      update: { title: p.title, source: p.source, url: p.url, prompt: p.prompt, approach: p.approach, tags: p.tags },
-      create: { ...p, createdById: null },
+    const existing = await prisma.problem.findFirst({
+      where: { createdById: null, slug: p.slug },
+      select: { id: true },
     });
+    const data = { title: p.title, source: p.source, url: p.url, prompt: p.prompt, approach: p.approach, tags: p.tags };
+    if (existing) {
+      await prisma.problem.update({ where: { id: existing.id }, data });
+    } else {
+      await prisma.problem.create({ data: { ...p, createdById: null } });
+    }
   }
 
   // 2. Stale-delete curated problems only — never touch user-authored ones.
