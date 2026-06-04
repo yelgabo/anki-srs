@@ -17,6 +17,8 @@ import {
   removeProblemFromGroup,
   createProblemInGroup,
   editProblem,
+  assertActiveStudyableGroup,
+  focusGroupCardWhere,
 } from "./group-actions";
 
 async function ownedGroup(userId: string, name = "G") {
@@ -432,5 +434,61 @@ describe("editProblem", () => {
     const p = await makeProblem("theirs", a.id);
     await expect(editProblem(b.id, p.id, { title: "hax" })).rejects.toMatchObject({ code: "forbidden" });
     expect((await prisma.problem.findUnique({ where: { id: p.id } }))!.title).toBe("theirs");
+  });
+});
+
+// ───── Focus session ─────
+
+describe("assertActiveStudyableGroup", () => {
+  it("passes for a studyable, active group", async () => {
+    const u = await makeUser({ groupsInitialized: true });
+    const g = await createGroup(u.id, "G");
+    await prisma.groupActivation.create({ data: { userId: u.id, groupId: g.id } });
+    await expect(assertActiveStudyableGroup(u.id, g.id)).resolves.toBeUndefined();
+  });
+
+  it("rejects a studyable group that is NOT active", async () => {
+    const u = await makeUser({ groupsInitialized: true });
+    const g = await createGroup(u.id, "G");
+    await expect(assertActiveStudyableGroup(u.id, g.id)).rejects.toMatchObject({ code: "forbidden" });
+  });
+
+  it("rejects another user's PRIVATE group (IDOR)", async () => {
+    const a = await makeUser();
+    const b = await makeUser();
+    const g = await createGroup(a.id, "A");
+    await prisma.groupActivation.create({ data: { userId: a.id, groupId: g.id } });
+    await expect(assertActiveStudyableGroup(b.id, g.id)).rejects.toMatchObject({ code: "forbidden" });
+  });
+});
+
+describe("focusGroupCardWhere", () => {
+  it("matches only the user's cards whose problem is in that group", async () => {
+    const u = await makeUser({ groupsInitialized: true });
+    const g1 = await createGroup(u.id, "G1");
+    const g2 = await createGroup(u.id, "G2");
+    const p1 = await makeProblem("in", u.id);
+    const p2 = await makeProblem("out", u.id);
+    await prisma.groupProblem.create({ data: { groupId: g1.id, problemId: p1.id } });
+    await prisma.groupProblem.create({ data: { groupId: g2.id, problemId: p2.id } });
+    await prisma.card.create({ data: { userId: u.id, problemId: p1.id } });
+    await prisma.card.create({ data: { userId: u.id, problemId: p2.id } });
+
+    const cards = await prisma.card.findMany({ where: focusGroupCardWhere(u.id, g1.id) });
+    expect(cards.map((c) => c.problemId)).toEqual([p1.id]);
+  });
+
+  it("never returns another user's cards", async () => {
+    const a = await makeUser({ groupsInitialized: true });
+    const b = await makeUser({ groupsInitialized: true });
+    const g = await prisma.group.create({ data: { ownerId: a.id, visibility: "SHARED", name: "S" } });
+    const p = await makeProblem("p", null);
+    await prisma.groupProblem.create({ data: { groupId: g.id, problemId: p.id } });
+    await prisma.card.create({ data: { userId: a.id, problemId: p.id } });
+    await prisma.card.create({ data: { userId: b.id, problemId: p.id } });
+
+    const cards = await prisma.card.findMany({ where: focusGroupCardWhere(a.id, g.id) });
+    expect(cards.every((c) => c.userId === a.id)).toBe(true);
+    expect(cards).toHaveLength(1);
   });
 });

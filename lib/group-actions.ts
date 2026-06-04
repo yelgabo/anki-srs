@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Group, Problem } from "@prisma/client";
+import type { Group, Problem, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { ensureCards } from "@/lib/groups";
 
@@ -182,4 +182,19 @@ export async function editProblem(userId: string, problemId: string, patch: Edit
   if (patch.tags !== undefined) data.tags = patch.tags;
   if (patch.url !== undefined) data.url = patch.url.trim() || null;
   return prisma.problem.update({ where: { id: problemId }, data });
+}
+
+// ───── Focus session (study one group) ─────
+
+/** Guard for the per-group focus session: the group must be studyable AND currently active for the user. */
+export async function assertActiveStudyableGroup(userId: string, groupId: string): Promise<void> {
+  await assertStudyableGroup(userId, groupId);
+  if (!(await isGroupActive(userId, groupId))) {
+    throw new GroupError("forbidden", "group is not active");
+  }
+}
+
+/** Cards belonging to the user whose problem is in exactly this one group. userId-scoped. */
+export function focusGroupCardWhere(userId: string, groupId: string): Prisma.CardWhereInput {
+  return { userId, problem: { groups: { some: { groupId } } } };
 }
