@@ -1,43 +1,71 @@
-import { PrismaClient } from "@prisma/client";
 import { SEED_PROBLEMS } from "../lib/seed-data";
+import { prisma } from "../lib/db";
+import { SYSTEM_GROUP_KEY, ensureCards } from "../lib/groups";
 
-const prisma = new PrismaClient();
-
-async function main() {
-  // Upsert curated problems (idempotent).
+export async function seedDatabase() {
+  // 1. Upsert curated problems in the createdById=NULL namespace.
+  //    Prisma can't upsert/findUnique on the @@unique([createdById, slug]) selector
+  //    when createdById is NULL (SQL NULLs aren't valid unique selectors), so we
+  //    find-then-update/create via a filter. Idempotent; preserves Problem ids so
+  //    existing Cards/ReviewLogs don't cascade-delete.
   for (const p of SEED_PROBLEMS) {
-    await prisma.problem.upsert({
-      where: { slug: p.slug },
-      update: {
-        title: p.title,
-        source: p.source,
-        url: p.url,
-        prompt: p.prompt,
-        approach: p.approach,
-        tags: p.tags,
-      },
-      create: p,
+    const existing = await prisma.problem.findFirst({
+      where: { createdById: null, slug: p.slug },
+      select: { id: true },
     });
+    const data = { title: p.title, source: p.source, url: p.url, prompt: p.prompt, approach: p.approach, tags: p.tags };
+    if (existing) {
+      await prisma.problem.update({ where: { id: existing.id }, data });
+    } else {
+      await prisma.problem.create({ data: { ...p, createdById: null } });
+    }
   }
 
-  // Remove problems whose slug is no longer in the curated list.
-  // Cards and ReviewLog rows referencing these will cascade-delete (per schema).
-  // Acceptable while the user base is small and pre-launch; revisit if review history matters.
-  const keepSlugs = new Set(SEED_PROBLEMS.map((p) => p.slug));
-  const stale = await prisma.problem.findMany({ select: { slug: true } });
-  const toDelete = stale.filter((p) => !keepSlugs.has(p.slug)).map((p) => p.slug);
-  if (toDelete.length > 0) {
-    const result = await prisma.problem.deleteMany({ where: { slug: { in: toDelete } } });
-    console.log(`Removed ${result.count} stale problems: ${toDelete.join(", ")}`);
+  // 2. Stale-delete curated problems only — never touch user-authored ones.
+  const keepSlugs = SEED_PROBLEMS.map((p) => p.slug);
+  const removed = await prisma.problem.deleteMany({
+    where: { createdById: null, slug: { notIn: keepSlugs } },
+  });
+  if (removed.count > 0) console.log(`Removed ${removed.count} stale curated problems`);
+
+  // 3. Upsert the system group by key.
+  const group = await prisma.group.upsert({
+    where: { key: SYSTEM_GROUP_KEY },
+    update: { name: "NeetCode 150", visibility: "SHARED", ownerId: null },
+    create: { key: SYSTEM_GROUP_KEY, name: "NeetCode 150", visibility: "SHARED", ownerId: null },
+  });
+
+  // 4. Attach every curated problem to the group (idempotent).
+  const curated = await prisma.problem.findMany({ where: { createdById: null }, select: { id: true } });
+  await prisma.groupProblem.createMany({
+    data: curated.map((p) => ({ groupId: group.id, problemId: p.id })),
+    skipDuplicates: true,
+  });
+
+  // 5. Re-ensure cards for everyone already activated on the system group,
+  //    so problems added after their activation still materialize.
+  const activations = await prisma.groupActivation.findMany({
+    where: { groupId: group.id },
+    select: { userId: true },
+  });
+  if (activations.length > 0) {
+    const problemIds = curated.map((p) => p.id);
+    for (const { userId } of activations) {
+      await ensureCards(userId, problemIds);
+    }
   }
 
   const count = await prisma.problem.count();
   console.log(`Seeded. Problem count = ${count}`);
+  return group;
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+// CLI entrypoint (npm run db:seed).
+if (require.main === module) {
+  seedDatabase()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(() => prisma.$disconnect());
+}

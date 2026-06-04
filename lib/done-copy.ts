@@ -1,15 +1,18 @@
 // Pure selector for the /today done-state copy. See spec §"Done-state copy variants".
 
-export type DoneVariant = "A" | "B" | "C" | "D" | "E";
+export type DoneVariant = "A" | "B" | "C" | "D" | "E" | "F";
 
 export interface DoneState {
   variant: DoneVariant;
   copy: string;
   showDueSoonCta: boolean;
+  showGroupsCta?: boolean;
 }
 
 export interface DoneArgs {
   hasAnyCards: boolean;
+  /** Effective active-set has at least one card. */
+  hasAnyActiveCard: boolean;
   /** Cards with dueAt <= now that the cap deferred. */
   excessDueToday: number;
   /** Cards with dueAt in (now, now + 3d]. */
@@ -24,6 +27,16 @@ export function selectDoneState(args: DoneArgs): DoneState {
   // A: no cards yet
   if (!args.hasAnyCards) {
     return { variant: "A", copy: "No cards in your deck yet.", showDueSoonCta: false };
+  }
+
+  // F: has cards, but none in any active group (deactivated everything)
+  if (!args.hasAnyActiveCard) {
+    return {
+      variant: "F",
+      copy: "No active groups. Activate one to start studying.",
+      showDueSoonCta: false,
+      showGroupsCta: true,
+    };
   }
 
   // B: cap-overflow today

@@ -1,0 +1,57 @@
+import { readFileSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "vitest/config";
+
+// Repo root (trailing slash), used to mirror tsconfig's "@/*" -> "./*".
+const rootDir = fileURLToPath(new URL(".", import.meta.url));
+
+// Scope the alias to "@/" so it never catches scoped npm packages like
+// @prisma/client or @auth/prisma-adapter. Must live on EACH project — vitest
+// resolves projects as independent configs and does not inherit root resolve.
+const resolve = {
+  alias: [{ find: /^@\/(.*)$/, replacement: `${rootDir}$1` }],
+};
+
+export default defineConfig({
+  resolve,
+  test: {
+    projects: [
+      {
+        // Pure-function tests — no DB, no setup. The existing lib/*.test.ts.
+        resolve,
+        test: {
+          name: "unit",
+          include: ["lib/**/*.test.ts"],
+          exclude: ["lib/**/*.db.test.ts"],
+          environment: "node",
+        },
+      },
+      {
+        // DB-backed integration tests — *.db.test.ts anywhere.
+        resolve,
+        test: {
+          name: "db",
+          include: ["**/*.db.test.ts"],
+          environment: "node",
+          env: loadEnvTest(),
+          globalSetup: ["./test/db/global-setup.ts"],
+          setupFiles: ["./test/db/setup.ts"],
+          fileParallelism: false,
+        },
+      },
+    ],
+  },
+});
+
+// Minimal .env.test loader (avoids adding a dotenv dependency).
+function loadEnvTest(): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!existsSync(".env.test")) return out;
+  for (const line of readFileSync(".env.test", "utf8").split("\n")) {
+    // Capture KEY=value, tolerate optional quotes, strip inline `# comments`
+    // and trailing whitespace so values like DATABASE_URL stay intact.
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*"?([^"#\n]*)"?\s*(?:#.*)?$/);
+    if (m) out[m[1]] = m[2].trim();
+  }
+  return out;
+}

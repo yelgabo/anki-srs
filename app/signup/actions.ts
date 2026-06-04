@@ -5,10 +5,10 @@ import { headers } from "next/headers";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { signIn } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { hash, validateStrength } from "@/lib/password";
 import { rateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/get-client-ip";
+import { createUserWithDefaultGroup } from "@/lib/groups";
 
 const SignupSchema = z.object({
   email: z.string().email().max(254).toLowerCase().trim(),
@@ -48,7 +48,7 @@ export async function signupAction(formData: FormData) {
   const passwordHash = await hash(password);
 
   try {
-    await prisma.user.create({ data: { email, passwordHash } });
+    await createUserWithDefaultGroup(email, passwordHash);
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       // Unique violation on email. Generic message — no enumeration.

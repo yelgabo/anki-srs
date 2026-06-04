@@ -1,0 +1,62 @@
+name: test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: anki_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Name contains "anki_test" so the harness destructive-reset guard allows it.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anki_test
+      AUTH_SECRET: ci-test-secret-not-for-prod
+      AUTH_TRUST_HOST: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps (runs prisma generate via postinstall)
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests (pure functions, no DB)
+        run: npm run test:unit
+
+      # The db vitest project reads .env.test via loadEnvTest(). It is gitignored,
+      # so synthesize it from the job env for CI. (process.env.DATABASE_URL is also
+      # set at job level, so global-setup + prisma work regardless.)
+      - name: Write .env.test for the db project
+        run: |
+          {
+            printf 'DATABASE_URL="%s"\n' "$DATABASE_URL"
+            printf 'AUTH_SECRET="%s"\n' "$AUTH_SECRET"
+            printf 'AUTH_TRUST_HOST="true"\n'
+          } > .env.test
+
+      - name: DB-backed tests
+        run: npm run test:db -- --passWithNoTests

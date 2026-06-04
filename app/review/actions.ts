@@ -230,27 +230,4 @@ export async function undoAction() {
   revalidatePath("/today");
 }
 
-// ----- ensureCards (unchanged from M1; M2.5 will scope by createdById) -----
-
-export async function ensureCards(userId: string): Promise<void> {
-  const problemIds = (await prisma.problem.findMany({ select: { id: true } })).map((p) => p.id);
-  if (problemIds.length === 0) return;
-
-  const existing = new Set(
-    (
-      await prisma.card.findMany({
-        where: { userId, problemId: { in: problemIds } },
-        select: { problemId: true },
-      })
-    ).map((c) => c.problemId),
-  );
-
-  const missing = problemIds.filter((id) => !existing.has(id));
-  if (missing.length === 0) return;
-
-  await prisma.card.createMany({
-    data: missing.map((problemId) => ({ userId, problemId })),
-    skipDuplicates: true,
-  });
-}
 
