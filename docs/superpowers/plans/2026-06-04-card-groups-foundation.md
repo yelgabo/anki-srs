@@ -1398,4 +1398,14 @@ git commit -m "docs: record activeCardWhere query plan + perf acceptance"
 - **Deferred to Plan 2/3 (intentionally absent here):** all `app/groups/actions.ts` server actions, ownership-guard helpers, `/groups` UI, Duplicate/deep-copy, focus session, orphaned-card list UI. `gradeCard` stays unchanged in this slice (spec §2).
 - **Type consistency:** `ensureCards(userId, problemIds)`, `activeCardWhere(userId, groupsInitialized)`, `hasAnyActiveCard(userId, groupsInitialized)`, `selfHealActiveCards(userId, groupsInitialized)`, `seedDatabase()`, `backfillGroups()`, `createUserWithDefaultGroup(email, passwordHash)`, `SYSTEM_GROUP_KEY` — names/signatures match across all tasks. `selectDoneState` gains `hasAnyActiveCard` input + `showGroupsCta` output, used consistently in T2.3.
 - **Ordering note:** `test/db/factory.ts` (T0.1) references `groupsInitialized`/`createdById` added in T1.1; the harness smoke test (T0.2) is deliberately ordered after T1.1.
-```
+
+## Implementation corrections (applied during execution, verified by CI)
+
+Deltas from the plan-as-written, each caught by the CI pipeline (typecheck + Postgres tests):
+
+1. **Vitest `@/` alias (T0.1).** vitest doesn't read tsconfig `paths`, so DB tests couldn't import `@/lib/db`. Added a regex alias `^@\/(.*)$ → <root>/$1` to `vitest.config.ts`, applied **per-project** (root `resolve` isn't inherited by `test.projects`).
+2. **Seed upsert (T1.3).** `where: { createdById_slug: { createdById: null, slug } }` does not type-check — Prisma compound-unique selectors reject a NULL component. Replaced with `findFirst({ where: { createdById: null, slug } })` → `update`/`create`. Spec §4 updated to match.
+3. **`createUserWithDefaultGroup` location (T1.5).** Importing `app/signup/actions.ts` in a test pulls in `next-auth` → `next/server`, which fails under vitest's node loader. Moved the pure-Prisma helper into `lib/groups.ts` (testable); `actions.ts` imports it. Test lives in `lib/groups.db.test.ts`.
+4. **CI as the runner (environment).** No local Node/Postgres on the dev machine, so verification runs in GitHub Actions (`.github/workflows/test.yml`: Postgres 16 service + typecheck + unit + db). Added a `tsc --noEmit` gate that caught #2.
+5. **T2.4 perf gate** is **documented, not CI-asserted** — CI's tiny synthetic dataset makes Postgres correctly seq-scan small tables, so a scan-type assertion there is a false signal. Live `EXPLAIN ANALYZE` is captured against the seeded Railway DB post-deploy (see `docs/superpowers/notes/2026-06-04-active-card-where-explain.md`).
+

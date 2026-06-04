@@ -276,14 +276,18 @@ Every action in `app/groups/actions.ts` is `auth()` + the predicate below. Helpe
 
 ## 4. Migration & seed
 
-- **Prisma migration** (additive): `Problem.createdById` + `createdBy onDelete: SetNull`; swap
-  `slug @unique` → `@@unique([createdById, slug])`; `User.groupsInitialized`; `Group`
-  (+ `key`, `visibility`); `GroupProblem`; `GroupActivation`; all indexes and `onDelete` rules.
-  Optionally a partial unique index on `Problem(slug) WHERE createdById IS NULL`.
+- **Schema apply:** this repo uses `prisma db push` (no migration files). Changes are additive:
+  `Problem.createdById` + `createdBy onDelete: SetNull`; swap `slug @unique` →
+  `@@unique([createdById, slug])`; `User.groupsInitialized`; `Group` (+ `key`, `visibility`);
+  `GroupProblem`; `GroupActivation`; all indexes and `onDelete` rules. Optionally a partial unique
+  index on `Problem(slug) WHERE createdById IS NULL`.
 - **Seed (idempotent, ordered):**
-  1. Upsert curated problems by the **composite unique**
-     `where: { createdById_slug: { createdById: null, slug: p.slug } }`, `create` sets
-     `createdById: null` (`where: { slug }` no longer compiles).
+  1. **Upsert curated problems via find-then-write** (NOT a composite-unique upsert). Prisma rejects
+     `where: { createdById_slug: { createdById: null, ... } }` — a compound-unique selector can't take
+     a NULL component (SQL NULLs aren't valid unique selectors). So per problem: `findFirst({ where:
+     { createdById: null, slug } })` → `update({ where: { id } })` if found, else `create({ data: {
+     ...p, createdById: null } })`. Idempotent; preserves Problem ids so Cards/ReviewLogs don't
+     cascade-delete.
   2. **Stale-deletion scoped to curated:**
      `deleteMany({ where: { slug: { notIn: keepSlugs }, createdById: null } })`. User-authored
      problems are never touched.
