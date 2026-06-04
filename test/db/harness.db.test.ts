@@ -18,6 +18,8 @@ describe("db harness", () => {
     const g = await prisma.group.create({
       data: { key: "g1", ownerId: null, visibility: "SHARED", name: "G1" },
     });
+    expect(p.id).toBeTruthy();
+    expect(g.id).toBeTruthy();
     await prisma.groupProblem.create({ data: { groupId: g.id, problemId: p.id } });
     const count = await prisma.groupProblem.count({ where: { groupId: g.id } });
     expect(count).toBe(1);

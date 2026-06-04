@@ -41,6 +41,9 @@ jobs:
       - name: Install deps (runs prisma generate via postinstall)
         run: npm ci
 
+      - name: Typecheck
+        run: npx tsc --noEmit
+
       - name: Unit tests (pure functions, no DB)
         run: npm run test:unit
 
