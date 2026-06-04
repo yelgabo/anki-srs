@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { ensureCards } from "@/app/review/actions";
+import { activeCardWhere, hasAnyActiveCard } from "@/lib/active-cards";
+import { selfHealActiveCards } from "@/lib/groups";
 import { startSessionAction } from "./actions";
 import { computeStreak } from "@/lib/streak";
 import { dayKey } from "@/lib/timezone";
@@ -22,30 +23,34 @@ export default async function TodayPage() {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) redirect("/signin");
 
-  await ensureCards(userId);
+  const gi = user.groupsInitialized;
+  await selfHealActiveCards(userId, gi);
+  const scope = activeCardWhere(userId, gi);
 
   const tz = user.timezone;
   const now = new Date();
   const threeDaysAhead = new Date(now.getTime() + THREE_DAYS_MS);
 
   const dueRowsCount = await prisma.card.count({
-    where: { userId, dueAt: { lte: now } },
+    where: { ...scope, dueAt: { lte: now } },
   });
   const cap = user.dailyReviewCap;
   const dueCount = Math.min(dueRowsCount, cap);
   const excessDue = Math.max(0, dueRowsCount - cap);
 
   const dueSoonCount = await prisma.card.count({
-    where: { userId, dueAt: { gt: now, lte: threeDaysAhead } },
+    where: { ...scope, dueAt: { gt: now, lte: threeDaysAhead } },
   });
 
   const nextDue = await prisma.card.findFirst({
-    where: { userId, dueAt: { gt: now } },
+    where: { ...scope, dueAt: { gt: now } },
     orderBy: { dueAt: "asc" },
     select: { dueAt: true },
   });
 
   const hasAnyCards = (await prisma.card.count({ where: { userId } })) > 0;
+
+  const anyActive = await hasAnyActiveCard(userId, gi);
 
   const reviewDayRows = await prisma.$queryRaw<{ d: Date }[]>`
     SELECT DISTINCT (date_trunc('day', "reviewedAt" AT TIME ZONE ${tz}))::date AS d
@@ -162,6 +167,7 @@ export default async function TodayPage() {
           dueSoonCount={dueSoonCount}
           nextDueAt={nextDue?.dueAt ?? null}
           now={now}
+          hasAnyActiveCard={anyActive}
         />
       )}
 
@@ -218,12 +224,14 @@ function DoneState({
   dueSoonCount,
   nextDueAt,
   now,
+  hasAnyActiveCard,
 }: {
   hasAnyCards: boolean;
   excessDueToday: number;
   dueSoonCount: number;
   nextDueAt: Date | null;
   now: Date;
+  hasAnyActiveCard: boolean;
 }) {
   const state = selectDoneState({
     hasAnyCards,
@@ -231,6 +239,7 @@ function DoneState({
     dueSoonCount,
     nextDueAt,
     now,
+    hasAnyActiveCard,
   });
 
   return (
@@ -247,6 +256,14 @@ function DoneState({
           className="inline-flex h-12 w-full sm:w-auto items-center justify-center rounded-lg border border-border-hi bg-surface-2 px-6 font-medium text-fg hover:border-accent hover:text-accent transition-colors"
         >
           Review {Math.min(5, dueSoonCount)} due soon →
+        </Link>
+      )}
+      {state.showGroupsCta && (
+        <Link
+          href="/groups"
+          className="inline-flex h-12 w-full sm:w-auto items-center justify-center rounded-lg border border-border-hi bg-surface-2 px-6 font-medium text-fg hover:border-accent hover:text-accent transition-colors"
+        >
+          Manage groups →
         </Link>
       )}
     </section>

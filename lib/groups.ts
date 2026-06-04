@@ -52,3 +52,26 @@ export async function createUserWithDefaultGroup(email: string, passwordHash: st
     return user;
   });
 }
+
+/**
+ * Ensure cards exist for every active-group problem the user is missing.
+ * Cheap + idempotent; covers new curated problems seeded after activation and any
+ * half-succeeded backfill. Only runs the create when there's a gap. No-op for
+ * fallback (uninitialized) users, who already see all curated cards.
+ */
+export async function selfHealActiveCards(userId: string, groupsInitialized: boolean): Promise<void> {
+  if (!groupsInitialized) return;
+  const activeProblems = await prisma.problem.findMany({
+    where: {
+      groups: {
+        some: {
+          group: { activations: { some: { userId } }, OR: [{ visibility: "SHARED" }, { ownerId: userId }] },
+        },
+      },
+      cards: { none: { userId } },
+    },
+    select: { id: true },
+  });
+  if (activeProblems.length === 0) return;
+  await ensureCards(userId, activeProblems.map((p) => p.id));
+}

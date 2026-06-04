@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { ensureCards } from "./actions";
+import { activeCardWhere } from "@/lib/active-cards";
+import { selfHealActiveCards } from "@/lib/groups";
 import { readSkipCookie } from "@/lib/skip-cookie";
 import ReviewCard from "./ReviewCard";
 import UndoButton from "@/app/components/UndoButton";
@@ -22,7 +23,10 @@ export default async function ReviewPage({ searchParams }: { searchParams: Searc
   const ahead = sp.ahead ? Math.max(0, Math.min(20, Number(sp.ahead) || 0)) : 0;
   const force = sp.force === "1";
 
-  await ensureCards(userId);
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { groupsInitialized: true } });
+  const gi = user?.groupsInitialized ?? false;
+  await selfHealActiveCards(userId, gi);
+  const scope = activeCardWhere(userId, gi);
 
   const skipped = await readSkipCookie(userId);
 
@@ -33,7 +37,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Searc
   if (ahead > 0) {
     card = await prisma.card.findFirst({
       where: {
-        userId,
+        ...scope,
         dueAt: { gt: now, lte: threeDaysAhead },
         id: { notIn: skipped },
       },
@@ -42,7 +46,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Searc
     });
   } else {
     card = await prisma.card.findFirst({
-      where: { userId, dueAt: { lte: now }, id: { notIn: skipped } },
+      where: { ...scope, dueAt: { lte: now }, id: { notIn: skipped } },
       orderBy: [{ dueAt: "asc" }, { id: "asc" }],
       include: { problem: true },
     });
@@ -50,7 +54,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Searc
 
   if (!card) redirect("/today");
 
-  const dueCount = await prisma.card.count({ where: { userId, dueAt: { lte: now } } });
+  const dueCount = await prisma.card.count({ where: { ...scope, dueAt: { lte: now } } });
 
   return (
     <div className="space-y-6 sm:space-y-8">

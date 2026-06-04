@@ -16,7 +16,6 @@ import {
   addDays,
 } from "@/lib/timezone";
 import { sign, verify, type SkipPayload } from "@/lib/signed-cookie";
-import { ensureCards as ensureCardsFor, defaultActivationProblemIds } from "@/lib/groups";
 
 const GradeSchema = z.object({
   cardId: z.string().min(1),
@@ -231,9 +230,4 @@ export async function undoAction() {
   revalidatePath("/today");
 }
 
-// TEMPORARY bridge (removed in T2.2): preserves "all curated cards exist" behavior
-// for the two page loads until they are scoped to active groups.
-export async function ensureCards(userId: string): Promise<void> {
-  await ensureCardsFor(userId, await defaultActivationProblemIds());
-}
 

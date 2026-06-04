@@ -7,6 +7,7 @@ describe("selectDoneState", () => {
   it("A: no cards", () => {
     const r = selectDoneState({
       hasAnyCards: false,
+      hasAnyActiveCard: true,
       excessDueToday: 0,
       dueSoonCount: 0,
       nextDueAt: null,
@@ -19,6 +20,7 @@ describe("selectDoneState", () => {
   it("B: cap-overflow today", () => {
     const r = selectDoneState({
       hasAnyCards: true,
+      hasAnyActiveCard: true,
       excessDueToday: 3,
       dueSoonCount: 0,
       nextDueAt: null,
@@ -33,6 +35,7 @@ describe("selectDoneState", () => {
     const nextDue = new Date("2026-05-27T12:00:00Z");
     const r = selectDoneState({
       hasAnyCards: true,
+      hasAnyActiveCard: true,
       excessDueToday: 0,
       dueSoonCount: 5,
       nextDueAt: nextDue,
@@ -47,6 +50,7 @@ describe("selectDoneState", () => {
     const nextDue = new Date("2026-06-01T12:00:00Z");
     const r = selectDoneState({
       hasAnyCards: true,
+      hasAnyActiveCard: true,
       excessDueToday: 0,
       dueSoonCount: 0,
       nextDueAt: nextDue,
@@ -60,6 +64,7 @@ describe("selectDoneState", () => {
   it("E: has cards but nothing scheduled", () => {
     const r = selectDoneState({
       hasAnyCards: true,
+      hasAnyActiveCard: true,
       excessDueToday: 0,
       dueSoonCount: 0,
       nextDueAt: null,
@@ -73,11 +78,39 @@ describe("selectDoneState", () => {
     const nextDue = new Date("2026-05-27T12:00:00Z");
     const r = selectDoneState({
       hasAnyCards: true,
+      hasAnyActiveCard: true,
       excessDueToday: 2,
       dueSoonCount: 3,
       nextDueAt: nextDue,
       now: NOW,
     });
     expect(r.variant).toBe("B");
+  });
+});
+
+describe("zero-active group state", () => {
+  it("shows the activate-a-group copy when initialized with no active cards", () => {
+    const state = selectDoneState({
+      hasAnyCards: true,
+      hasAnyActiveCard: false,
+      excessDueToday: 0,
+      dueSoonCount: 0,
+      nextDueAt: null,
+      now: new Date("2026-06-04T12:00:00Z"),
+    });
+    expect(state.copy).toMatch(/no active group/i);
+    expect(state.showGroupsCta).toBe(true);
+  });
+
+  it("does not show the groups CTA when there are active cards due soon", () => {
+    const state = selectDoneState({
+      hasAnyCards: true,
+      hasAnyActiveCard: true,
+      excessDueToday: 0,
+      dueSoonCount: 3,
+      nextDueAt: new Date("2026-06-05T12:00:00Z"),
+      now: new Date("2026-06-04T12:00:00Z"),
+    });
+    expect(state.showGroupsCta).toBeFalsy();
   });
 });
