@@ -98,6 +98,12 @@ export default async function TodayPage() {
         </div>
         <div className="flex items-center gap-2">
           <UndoButton />
+          <Link
+            href="/groups"
+            className="h-9 rounded-lg border border-border bg-surface px-3 text-xs text-fg-2 hover:border-border-hi hover:text-fg transition-colors flex items-center"
+          >
+            Groups
+          </Link>
           <form
             action={async () => {
               "use server";
