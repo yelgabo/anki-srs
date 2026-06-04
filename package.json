@@ -11,7 +11,11 @@
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:db:up": "docker compose -f docker-compose.test.yml up -d",
+    "test:db:down": "docker compose -f docker-compose.test.yml down",
+    "test:unit": "vitest run --project unit",
+    "test:db": "vitest run --project db"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
