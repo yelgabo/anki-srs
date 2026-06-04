@@ -1,7 +1,16 @@
 import { readFileSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
+// Repo root (trailing slash), used to mirror tsconfig's "@/*" -> "./*".
+const rootDir = fileURLToPath(new URL(".", import.meta.url));
+
 export default defineConfig({
+  resolve: {
+    // Scope the alias to "@/" so it never catches scoped npm packages
+    // like @prisma/client or @auth/prisma-adapter.
+    alias: [{ find: /^@\/(.*)$/, replacement: `${rootDir}$1` }],
+  },
   test: {
     projects: [
       {
