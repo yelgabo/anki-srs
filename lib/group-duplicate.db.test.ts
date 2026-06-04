@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { prisma } from "@/lib/db";
 import { makeUser, makeProblem } from "@/test/db/factory";
+import { MAX_GROUPS_PER_USER, MAX_AUTHORED_PROBLEMS_PER_USER } from "./group-actions";
 import { duplicateGroup } from "./group-duplicate";
 
 /** A curated SHARED system group with `n` curated problems attached. */
@@ -128,5 +129,43 @@ describe("duplicateGroup", () => {
   it("throws not_found for a missing group", async () => {
     const u = await makeUser();
     await expect(duplicateGroup(u.id, "nope")).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("copies an empty curated group (no problems, no cards)", async () => {
+    const u = await makeUser({ groupsInitialized: true });
+    const src = await prisma.group.create({ data: { ownerId: null, visibility: "SHARED", name: "Empty" } });
+    const copy = await duplicateGroup(u.id, src.id);
+    expect(copy.ownerId).toBe(u.id);
+    expect(await prisma.groupProblem.count({ where: { groupId: copy.id } })).toBe(0);
+  });
+
+  it("rejects when the user is at the owned-group cap", async () => {
+    const u = await makeUser();
+    const src = await curatedGroup("S", ["a"]);
+    await prisma.group.createMany({
+      data: Array.from({ length: MAX_GROUPS_PER_USER }, (_, i) => ({
+        ownerId: u.id,
+        visibility: "PRIVATE" as const,
+        name: `g${i}`,
+      })),
+    });
+    await expect(duplicateGroup(u.id, src.id)).rejects.toMatchObject({ code: "cap_exceeded" });
+  });
+
+  it("rejects when the copy would exceed the authored-problem cap", async () => {
+    const u = await makeUser();
+    const src = await curatedGroup("S", ["a"]); // would add 1 problem
+    await prisma.problem.createMany({
+      data: Array.from({ length: MAX_AUTHORED_PROBLEMS_PER_USER }, (_, i) => ({
+        slug: `cap-${i}`,
+        createdById: u.id,
+        title: `t${i}`,
+        source: "custom",
+        prompt: "p",
+        approach: "a",
+        tags: [],
+      })),
+    });
+    await expect(duplicateGroup(u.id, src.id)).rejects.toMatchObject({ code: "cap_exceeded" });
   });
 });
