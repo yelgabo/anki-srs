@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { hash, validateStrength } from "@/lib/password";
 import { rateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/get-client-ip";
+import { SYSTEM_GROUP_KEY } from "@/lib/groups";
 
 const SignupSchema = z.object({
   email: z.string().email().max(254).toLowerCase().trim(),
@@ -17,6 +18,32 @@ const SignupSchema = z.object({
 });
 
 const HOUR = 60 * 60 * 1000;
+
+/**
+ * Create the user and, if the system group exists, activate it + materialize its
+ * cards + set groupsInitialized — all in one transaction. signIn is NOT called here
+ * (it re-queries the DB and throws NEXT_REDIRECT; it cannot live in a transaction).
+ * A missing system group is tolerated: the user is created with the flag false, and
+ * the activeCardWhere fallback yields the curated pile.
+ */
+export async function createUserWithDefaultGroup(email: string, passwordHash: string) {
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({ data: { email, passwordHash } });
+    const group = await tx.group.findUnique({
+      where: { key: SYSTEM_GROUP_KEY },
+      select: { id: true, problems: { select: { problemId: true } } },
+    });
+    if (group) {
+      await tx.groupActivation.create({ data: { userId: user.id, groupId: group.id } });
+      await tx.card.createMany({
+        data: group.problems.map((p) => ({ userId: user.id, problemId: p.problemId })),
+        skipDuplicates: true,
+      });
+      await tx.user.update({ where: { id: user.id }, data: { groupsInitialized: true } });
+    }
+    return user;
+  });
+}
 
 export async function signupAction(formData: FormData) {
   const parsed = SignupSchema.safeParse({
@@ -48,7 +75,7 @@ export async function signupAction(formData: FormData) {
   const passwordHash = await hash(password);
 
   try {
-    await prisma.user.create({ data: { email, passwordHash } });
+    await createUserWithDefaultGroup(email, passwordHash);
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       // Unique violation on email. Generic message — no enumeration.
