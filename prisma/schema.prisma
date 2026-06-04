@@ -25,6 +25,11 @@ model User {
   cards         Card[]
   reviews       ReviewLog[]
   streakFreezes StreakFreeze[]
+
+  groupsInitialized Boolean           @default(false)
+  authoredProblems  Problem[]         @relation("AuthoredProblems")
+  ownedGroups       Group[]           @relation("OwnedGroups")
+  activations       GroupActivation[]
 }
 
 model Account {
@@ -65,19 +70,68 @@ model VerificationToken {
 // --- Domain models ---
 
 model Problem {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  title     String
-  source    String
-  url       String?
-  // Prompt the user sees first.
-  prompt    String   @db.Text
-  // Approach/answer shown after self-recall.
-  approach  String   @db.Text
-  tags      String[]
-  createdAt DateTime @default(now())
+  id          String         @id @default(cuid())
+  slug        String
+  title       String
+  source      String
+  url         String?
+  prompt      String         @db.Text
+  approach    String         @db.Text
+  tags        String[]
+  createdById String?
+  createdBy   User?          @relation("AuthoredProblems", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
 
-  cards Card[]
+  cards  Card[]
+  groups GroupProblem[]
+
+  @@unique([createdById, slug])
+}
+
+enum GroupVisibility {
+  PRIVATE
+  SHARED
+}
+
+model Group {
+  id            String          @id @default(cuid())
+  key           String?         @unique
+  ownerId       String?
+  owner         User?           @relation("OwnedGroups", fields: [ownerId], references: [id], onDelete: Cascade)
+  visibility    GroupVisibility @default(PRIVATE)
+  name          String
+  description   String?
+  sourceGroupId String?
+  createdAt     DateTime        @default(now())
+
+  problems    GroupProblem[]
+  activations GroupActivation[]
+
+  @@index([ownerId])
+  @@index([visibility])
+}
+
+model GroupProblem {
+  groupId   String
+  problemId String
+  addedAt   DateTime @default(now())
+
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, problemId])
+  @@index([problemId])
+}
+
+model GroupActivation {
+  userId  String
+  groupId String
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([userId, groupId])
+  @@index([userId])
 }
 
 model Card {
