@@ -39,6 +39,16 @@ for coding-interview prep.
   preferred approach in your own words. Make a copy of the curated set and edit it to match how *you*
   think.
 
+## See it in action
+
+**Your day at a glance** — streaks, what's due, and one button to start.
+
+![Today dashboard: daily/weekly/longest streaks and 50 cards due](docs/images/today.png)
+
+**One card at a time** — recall the approach, reveal it, then grade *Again / Hard / Good / Easy*.
+
+![Review card: problem prompt, revealed approach, and the four grade buttons](docs/images/review.png)
+
 ## How to use it
 
 1. **Sign up** with an email and password.
