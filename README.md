@@ -6,6 +6,10 @@ anki-srs is a spaced-repetition trainer for coding interviews. It shows you the 
 right time — just before you'd forget it — so the patterns actually stick. Work through the curated
 NeetCode 150, build your own sets, and keep a daily habit that compounds.
 
+### → [**Try it live: anki-srs-production.up.railway.app**](https://anki-srs-production.up.railway.app)
+
+Sign up with an email and start studying in under a minute.
+
 ## Why it works
 
 Cramming 50 problems in a weekend feels productive and fades by Monday. Spaced repetition flips that:
