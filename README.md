@@ -10,6 +10,8 @@ NeetCode 150, build your own sets, and keep a daily habit that compounds.
 
 Sign up with an email and start studying in under a minute.
 
+[![anki-srs — spaced repetition for coding interview problems](docs/images/landing.png)](https://anki-srs-production.up.railway.app)
+
 ## Why it works
 
 Cramming 50 problems in a weekend feels productive and fades by Monday. Spaced repetition flips that:
