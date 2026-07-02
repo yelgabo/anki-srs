@@ -56,6 +56,14 @@ contains `anki_test` (the harness refuses to force-reset otherwise — it would 
   `where: { createdById_slug: { createdById: null, ... } }` — it fails `tsc`.
 - **This repo uses `prisma db push`, not migration files** (no `prisma/migrations/`). Schema
   changes are applied via push (dev, CI global-setup, and Railway's deploy `startCommand`).
+  **Data-loss safety (2026-07-02 security audit):** the Railway `startCommand` no longer passes
+  `--accept-data-loss`. Previously, because there is no migration history, a schema edit Prisma
+  resolves as drop-and-recreate would **silently wipe prod data** on deploy. Now such a change
+  **errors and aborts the deploy** instead — additive/safe changes still apply automatically. If
+  you make a destructive schema change, the deploy will fail loudly; resolve it deliberately (and
+  strongly consider adopting real migrations). The full rationale + a step-by-step plan to move to
+  `prisma migrate deploy` (including baselining the existing prod DB) is in
+  `docs/deployment-db-migrations.md`.
 
 ---
 
