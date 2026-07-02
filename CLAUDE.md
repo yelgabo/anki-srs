@@ -56,6 +56,14 @@ contains `anki_test` (the harness refuses to force-reset otherwise — it would 
   `where: { createdById_slug: { createdById: null, ... } }` — it fails `tsc`.
 - **This repo uses `prisma db push`, not migration files** (no `prisma/migrations/`). Schema
   changes are applied via push (dev, CI global-setup, and Railway's deploy `startCommand`).
+  **Data-loss safety (2026-07-02 security audit):** the Railway `startCommand` no longer passes
+  `--accept-data-loss`. Previously, because there is no migration history, a schema edit Prisma
+  resolves as drop-and-recreate would **silently wipe prod data** on deploy. Now such a change
+  **errors and aborts the deploy** instead — additive/safe changes still apply automatically. If
+  you make a destructive schema change, the deploy will fail loudly; resolve it deliberately (and
+  strongly consider adopting real migrations). The full rationale + a step-by-step plan to move to
+  `prisma migrate deploy` (including baselining the existing prod DB) is in
+  `docs/deployment-db-migrations.md`.
 
 ---
 
@@ -134,6 +142,12 @@ found no IDOR bypass). The **UI has not been click-verified in a browser** (CI c
 - Post-duplicate "deactivate the original?" is a note in v1, not a one-click prompt.
 - Focus-session ("Study this group") may route to `/review` after grading (reuses `ReviewCard`);
   per-group auto-advance is a follow-up.
+- **P3 (security follow-up):** as of the 2026-07-02 audit, all *write* paths validate `Problem.url`
+  against an http/https allowlist (`sanitizeProblemUrl` in `lib/group-actions.ts`, applied in
+  create/edit/duplicate). Rows written **before** that fix are not retroactively scrubbed — a
+  one-time backfill script (find `Problem` rows whose `url` fails `new URL()` / isn't http(s), set
+  them to `null`) is the clean follow-up. Low risk in practice (authored urls were always trusted
+  input from the owner), so deferred, not done here.
 
 ---
 

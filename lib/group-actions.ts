@@ -47,6 +47,28 @@ export async function assertStudyableGroup(userId: string, groupId: string): Pro
 
 // ───── Helpers ─────
 
+/**
+ * Validate + normalize a user-supplied problem URL. Returns null for empty
+ * input. Only http:/https: schemes are allowed — `javascript:`, `data:`, etc.
+ * are rejected so the value is safe to render into an <a href> (stored-XSS
+ * defense; ReviewCard renders this into a link). Throws GroupError on a
+ * malformed or disallowed URL.
+ */
+export function sanitizeProblemUrl(raw: string | null | undefined): string | null {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new GroupError("invalid_problem", "invalid url");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new GroupError("invalid_problem", "invalid url scheme");
+  }
+  return parsed.toString();
+}
+
 /** Is this group currently in the user's active set? */
 export async function isGroupActive(userId: string, groupId: string): Promise<boolean> {
   const row = await prisma.groupActivation.findUnique({
@@ -150,7 +172,7 @@ export async function createProblemInGroup(
       createdById: userId,
       title,
       source: "custom",
-      url: input.url?.trim() || null,
+      url: sanitizeProblemUrl(input.url),
       prompt: input.prompt,
       approach: input.approach,
       tags: input.tags,
@@ -180,7 +202,7 @@ export async function editProblem(userId: string, problemId: string, patch: Edit
   if (patch.prompt !== undefined) data.prompt = patch.prompt;
   if (patch.approach !== undefined) data.approach = patch.approach;
   if (patch.tags !== undefined) data.tags = patch.tags;
-  if (patch.url !== undefined) data.url = patch.url.trim() || null;
+  if (patch.url !== undefined) data.url = sanitizeProblemUrl(patch.url);
   return prisma.problem.update({ where: { id: problemId }, data });
 }
 

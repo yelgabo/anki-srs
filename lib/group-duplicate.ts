@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { Group } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { GroupError, MAX_GROUPS_PER_USER, MAX_AUTHORED_PROBLEMS_PER_USER } from "@/lib/group-actions";
+import {
+  GroupError,
+  MAX_GROUPS_PER_USER,
+  MAX_AUTHORED_PROBLEMS_PER_USER,
+  sanitizeProblemUrl,
+} from "@/lib/group-actions";
 
 /** "<base> (copy)", then "(copy 2)", "(copy 3)" … unique among the user's owned groups. */
 async function disambiguatedCopyName(userId: string, base: string): Promise<string> {
@@ -69,7 +74,10 @@ export async function duplicateGroup(userId: string, sourceGroupId: string): Pro
           createdById: userId,
           title: sp.title,
           source: sp.source,
-          url: sp.url,
+          // Re-validate on copy so a pre-existing unsafe scheme (e.g. javascript:)
+          // can't survive duplication into an owned, editable problem. Curated
+          // source urls are always http(s), so this never throws in practice.
+          url: sanitizeProblemUrl(sp.url),
           prompt: sp.prompt,
           approach: sp.approach,
           tags: sp.tags,
