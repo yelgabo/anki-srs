@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
+import { headers } from "next/headers";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { verify, KNOWN_BAD_HASH } from "@/lib/password";
 import { rateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/get-client-ip";
 
 const SigninSchema = z.object({
   email: z.string().email().max(254).toLowerCase().trim(),
@@ -35,13 +37,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!parsed.success) return null;
         const { email, password } = parsed.data;
 
-        // Per-email rate limit. NextAuth exposes POST /api/auth/callback/
-        // credentials directly, bypassing the signinAction wrapper, so the
-        // credential-stuffing defense must live HERE too. Shares the exact key
-        // (`signin:email:*`, 5 / 5min) with app/signin/actions.ts, so both
-        // entry points draw from one bucket.
-        const rl = rateLimit({ key: `signin:email:${email}`, limit: 5, windowMs: FIVE_MIN });
-        if (!rl.ok) return null;
+        // Rate limiting lives HERE — the single source of truth for BOTH entry
+        // paths. NextAuth exposes POST /api/auth/callback/credentials directly
+        // (bypassing the signinAction wrapper), and signIn() from the form
+        // routes THROUGH this callback, so the limiter must sit here to cover
+        // both without double-counting. Per-email (5/5min) is the credential-
+        // stuffing defense; per-IP (20/5min) is the spray defense. `headers()`
+        // is valid here: authorize runs in the credentials route-handler (Node
+        // runtime, server-side request context).
+        const ip = getClientIp(await headers());
+        const ipLimit = rateLimit({ key: `signin:ip:${ip}`, limit: 20, windowMs: FIVE_MIN });
+        const emailLimit = rateLimit({ key: `signin:email:${email}`, limit: 5, windowMs: FIVE_MIN });
+        if (!ipLimit.ok || !emailLimit.ok) return null;
 
         const user = await prisma.user.findUnique({ where: { email } });
 

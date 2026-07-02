@@ -54,7 +54,7 @@ export async function assertStudyableGroup(userId: string, groupId: string): Pro
  * defense; ReviewCard renders this into a link). Throws GroupError on a
  * malformed or disallowed URL.
  */
-export function sanitizeProblemUrl(raw: string | undefined): string | null {
+export function sanitizeProblemUrl(raw: string | null | undefined): string | null {
   const trimmed = (raw ?? "").trim();
   if (!trimmed) return null;
   let parsed: URL;

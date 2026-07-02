@@ -142,6 +142,12 @@ found no IDOR bypass). The **UI has not been click-verified in a browser** (CI c
 - Post-duplicate "deactivate the original?" is a note in v1, not a one-click prompt.
 - Focus-session ("Study this group") may route to `/review` after grading (reuses `ReviewCard`);
   per-group auto-advance is a follow-up.
+- **P3 (security follow-up):** as of the 2026-07-02 audit, all *write* paths validate `Problem.url`
+  against an http/https allowlist (`sanitizeProblemUrl` in `lib/group-actions.ts`, applied in
+  create/edit/duplicate). Rows written **before** that fix are not retroactively scrubbed — a
+  one-time backfill script (find `Problem` rows whose `url` fails `new URL()` / isn't http(s), set
+  them to `null`) is the clean follow-up. Low risk in practice (authored urls were always trusted
+  input from the owner), so deferred, not done here.
 
 ---
 
