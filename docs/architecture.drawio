@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="Architecture">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1360" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- TIER 1: Client -->
+        <mxCell id="t1" value="Browser  —  React client components  (app/**)" style="swimlane;startSize=30;html=1;whiteSpace=wrap;fillColor=#eef3fb;strokeColor=#6c8ebf;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1420" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="cl_review" value="ReviewCard&#xa;grade / skip / undo&#xa;(text via JSX nodes — escaped)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="t1">
+          <mxGeometry x="40" y="50" width="330" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="cl_group" value="GroupToggle · ProblemForm&#xa;card-group authoring&#xa;(client type=url + server sanitizeProblemUrl)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="t1">
+          <mxGeometry x="450" y="50" width="330" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="cl_misc" value="UndoButton · TimezoneCapture&#xa;receive plain scalar props only&#xa;(no NEXT_PUBLIC secrets)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="t1">
+          <mxGeometry x="860" y="50" width="330" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- TIER 2: Auth -->
+        <mxCell id="t2" value="Authentication  —  NextAuth v5  (lib/auth.ts)" style="swimlane;startSize=30;html=1;whiteSpace=wrap;fillColor=#f3eef8;strokeColor=#9673a6;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="210" width="1420" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="au_cred" value="Credentials provider&#xa;bcryptjs cost 12 · zod-validated&#xa;timing-equalized (KNOWN_BAD_HASH)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="t2">
+          <mxGeometry x="60" y="50" width="400" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="au_jwt" value="JWT session (7-day)&#xa;__Secure- cookie, httpOnly, SameSite=Lax&#xa;auth() gate on every page/action" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="t2">
+          <mxGeometry x="540" y="50" width="400" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="au_rl" value="Rate limit + client IP&#xa;lib/rate-limit.ts · lib/get-client-ip.ts (in-process, 1 replica)&#xa;signin 20/5m IP + 5/5m email · signup 10/h IP + 3/h email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="t2">
+          <mxGeometry x="1020" y="50" width="360" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- TIER 3: Server actions / routes -->
+        <mxCell id="t3" value="Next.js Server  —  RSC pages + server actions + route handlers  (&quot;use server&quot;, origin-checked)" style="swimlane;startSize=30;html=1;whiteSpace=wrap;fillColor=#fafafa;strokeColor=#999999;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="390" width="1420" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="sv_review" value="Review actions&#xa;app/review/actions.ts&#xa;gradeCard · skipAction (HMAC cookie) · undoAction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="t3">
+          <mxGeometry x="40" y="55" width="420" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="sv_group" value="Group actions&#xa;app/groups/actions.ts (10 actions)&#xa;create · rename · delete · activate · author · duplicate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="t3">
+          <mxGeometry x="520" y="55" width="440" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="sv_route" value="Route handlers&#xa;/api/user/timezone&#xa;/api/auth/[...nextauth]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="t3">
+          <mxGeometry x="1020" y="55" width="360" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- TIER 4: lib/ business core -->
+        <mxCell id="t4" value="Business core  —  lib/  ·  pure userId-scoped functions, DB-tested under Vitest" style="swimlane;startSize=30;html=1;whiteSpace=wrap;fillColor=#fdf3ec;strokeColor=#d79b00;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="590" width="1420" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="g_assert" value="assertOwnedGroup · assertOwnedProblem · assertStudyableGroup&#xa;ownership guards — every ID-taking action passes through&#xa;(lib/group-actions.ts · IDOR suite: group-actions.db.test.ts)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="t4">
+          <mxGeometry x="80" y="50" width="420" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="g_where" value="activeCardWhere · focusGroupCardWhere&#xa;shared Prisma where-builders always embed userId&#xa;(lib/active-cards.ts · lib/group-actions.ts)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="t4">
+          <mxGeometry x="540" y="50" width="420" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="g_domain" value="srs.ts (SM-2 + deterministic fuzz) · streak.ts · timezone.ts&#xa;groups.ts · group-views.ts · group-duplicate.ts&#xa;pure domain logic — unit/DB-tested" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="t4">
+          <mxGeometry x="980" y="50" width="420" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- TIER 5: Data access -->
+        <mxCell id="t5" value="Data Access  —  Prisma Client   ·   parameterized $queryRaw tagged templates" style="swimlane;startSize=30;html=1;whiteSpace=wrap;fillColor=#fafafa;strokeColor=#999999;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="780" width="1420" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="prisma" value="prisma/schema.prisma  —  field-by-field data (no mass assignment)   ·   indexes: Card[userId,dueAt] · ReviewLog[userId,reviewedAt] · GroupProblem[problemId]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="t5">
+          <mxGeometry x="120" y="50" width="1180" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- TIER 6: Storage -->
+        <mxCell id="t6" value="Storage  —  PostgreSQL  (Railway, DATABASE_URL)   ·   prisma db push, no migrations dir — destructive schema changes abort the deploy (no --accept-data-loss)" style="swimlane;startSize=30;html=1;whiteSpace=wrap;fillColor=#eef7ec;strokeColor=#82b366;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="930" width="1420" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="db_user" value="User&#xa;/ Session" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="t6">
+          <mxGeometry x="70" y="45" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="db_card" value="Card&#xa;/ ReviewLog" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="t6">
+          <mxGeometry x="370" y="45" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="db_group" value="Group&#xa;(card-groups)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="t6">
+          <mxGeometry x="670" y="45" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="db_gp" value="GroupProblem&#xa;/ GroupActivation&#xa;(cascade delete)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="t6">
+          <mxGeometry x="970" y="45" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="db_prob" value="Problem&#xa;(url field)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="t6">
+          <mxGeometry x="1270" y="45" width="120" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Caption -->
+        <mxCell id="cap" value="CI: GitHub Actions — tsc + vitest unit + DB (IDOR / cross-user isolation; docker-compose.test.yml).   Deploy: Railway — boot runs guarded prisma db push + idempotent seed.   Known gaps: no next build in CI · in-process rate limit (single replica).   Review + plan: docs/architecture-review-2026-07-10.md" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="190" y="1140" width="1120" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- EDGES -->
+        <mxCell id="e1" value="POST form / server-action call" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="cl_review" target="au_cred">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="cl_group" target="au_jwt">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="session established" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="au_jwt" target="sv_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="throttle" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="au_rl" target="sv_route">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="ownership check" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="sv_review" target="g_assert">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="userId-scoped where" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="sv_group" target="g_where">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="delegate" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="sv_group" target="g_domain">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="guarded query" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="g_assert" target="prisma">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="g_where" target="prisma">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="g_domain" target="prisma">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#b85450;fontColor=#b85450;exitX=0.02;exitY=1;exitDx=0;exitDy=0;entryX=0.02;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="sv_review" target="prisma">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note_breach" value="red dashed = layering breach: gradeCard/undo SM-2 apply + freeze-grant tx live in app/review/actions.ts (wrapper) — untested; fix in plan P0" style="text;html=1;align=left;verticalAlign=middle;fontColor=#b85450;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="140" y="742" width="900" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="read/write" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="prisma" target="db_card">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="prisma" target="db_gp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

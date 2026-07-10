@@ -9,6 +9,11 @@ Router, RSC + server actions) · Prisma 6 · PostgreSQL · Auth.js v5 (credentia
 Railway. See `README.md` for the base module map; this file covers **testing/CI** and the
 **Card Groups** feature added on 2026-06-04.
 
+**Before making significant changes, read `docs/architecture-review-2026-07-10.md`** — a full
+adversarial architecture review with a prioritized plan of attack (P0 items are live correctness
+bugs: timezone-inverted streak SQL, boot-seed cascade-delete lever, untested gradeCard/undo core).
+The architecture diagram is `docs/architecture.drawio` / `.drawio.png` — keep it current.
+
 ---
 
 ## Testing & CI — read this first
