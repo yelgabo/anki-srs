@@ -155,8 +155,9 @@ found no IDOR bypass). The **UI has not been click-verified in a browser** (CI c
 
 - **TDD via CI:** add a `*.db.test.ts` (or unit test), implement in `lib/`, push, confirm green.
   Each `docs/superpowers/plans/*.md` is a task-by-task plan; the design spec is the contract.
-- **Commit messages** end with `Co-Authored-By: Claude ...` and are scoped/small. Branch off
-  `main`; merge with `--no-ff` once CI is green (the author reviewed + merged each plan this way).
+- **Commit messages** are scoped/small with NO Claude attribution (no Co-Authored-By trailers —
+  owner preference, 2026-07-10). Branch off `main`; merge with `--no-ff` once CI is green
+  (the author reviewed + merged each plan this way).
 - When in doubt about group semantics, the spec
   (`docs/superpowers/specs/2026-06-04-card-groups-design.md`) is authoritative.
 
